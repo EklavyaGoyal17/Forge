@@ -1,0 +1,77 @@
+import { useQuery } from '@tanstack/react-query'
+import { ArrowRight } from 'lucide-react'
+import { Link } from 'react-router'
+import { Badge, Button, Card, EmptyState } from '../components/ui'
+import type { Lab } from '../lib/api'
+import { api } from '../lib/api'
+import { MODULES } from '../lib/labs'
+import { ExperimentTable } from './Experiments'
+import { PlannedModule } from './PlannedModule'
+
+const LAB_INTRO: Partial<Record<Lab, { heading: string; points: string[] }>> = {
+  CONCURRENCY: {
+    heading: 'Two ways to look at the same code',
+    points: [
+      'Stress mode runs real threads at full speed on real cores. It tells you how often a bug shows up on this machine — and nothing about whether it can.',
+      'Explorer mode runs the same implementation on real threads under a controlled scheduler that lets one thread move between instrumented yield points, and enumerates every interleaving. It produces a concrete counterexample schedule.',
+      'Neither proves the absence of bugs: stress testing samples schedules; the explorer is exhaustive only at its granularity and assumes sequential consistency (no JMM reorderings).',
+    ],
+  },
+  ALGORITHMS: {
+    heading: 'Complexity is a growth rate, not a time',
+    points: [
+      'Microbenchmarks run under JMH in freshly forked JVMs with warm-up iterations and dead-code-elimination protection — never with a hand-written nanoTime loop.',
+      'Every result applies to one size, one distribution and one machine. Re-run at the sizes your system actually uses before deciding.',
+    ],
+  },
+}
+
+export function LabPage({ lab }: { lab: Lab }) {
+  const module = MODULES.find((m) => m.lab === lab)!
+  const scenarios = useQuery({ queryKey: ['scenarios'], queryFn: api.scenarios })
+  const experiments = useQuery({ queryKey: ['experiments', '', lab], queryFn: () => api.experiments(undefined, lab.toLowerCase()) })
+  if (!module.implemented) return <PlannedModule module={module} />
+  const list = scenarios.data?.filter((s) => s.lab === lab) ?? []
+  const intro = LAB_INTRO[lab]
+
+  return (
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 p-6">
+      <div>
+        <h1 className="text-[22px] font-semibold tracking-tight">{module.label}</h1>
+        <p className="text-dim">{module.blurb}</p>
+      </div>
+      {intro && (
+        <Card title={intro.heading}>
+          <ul className="flex list-disc flex-col gap-2 pl-4 text-[13px] leading-relaxed text-dim">
+            {intro.points.map((p) => <li key={p}>{p}</li>)}
+          </ul>
+        </Card>
+      )}
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        {list.map((s) => (
+          <Card key={s.id}>
+            <div className="flex h-full flex-col gap-3">
+              <h2 className="font-semibold">{s.title}</h2>
+              <p className="text-[13px] leading-relaxed text-dim">{s.summary}</p>
+              <p className="text-[12.5px] italic text-muted">“{s.question}”</p>
+              <div className="flex flex-wrap gap-1.5">
+                {s.variants.map((v) => (
+                  <Badge key={v.id} tone={v.expectedCorrect === false ? 'bad' : v.expectedCorrect ? 'ok' : 'neutral'} title={v.description}>{v.label}</Badge>
+                ))}
+              </div>
+              {s.invariant && <p className="text-[12px] text-muted"><span className="text-dim">Invariant:</span> {s.invariant}</p>}
+              <div className="mt-auto">
+                <Link to={`/experiments/new?scenario=${encodeURIComponent(s.id)}`}><Button variant="primary">Start experiment <ArrowRight size={14} /></Button></Link>
+              </div>
+            </div>
+          </Card>
+        ))}
+        {list.length === 0 && !scenarios.isLoading && <EmptyState title="No scenarios in this lab yet" />}
+      </div>
+      <div className="flex flex-col gap-3">
+        <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dim">Experiments in this lab</h2>
+        <ExperimentTable rows={experiments.data} loading={experiments.isLoading} />
+      </div>
+    </div>
+  )
+}

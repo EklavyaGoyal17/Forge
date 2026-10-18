@@ -1,0 +1,34 @@
+import type { Lab } from './api'
+
+/** Navigation model. `phase` documents when a module is planned; `implemented` must be truthful. */
+export interface ModuleInfo {
+  path: string
+  label: string
+  shortcut: string
+  lab?: Lab
+  implemented: boolean
+  phase?: number
+  blurb: string
+}
+
+export const MODULES: ModuleInfo[] = [
+  { path: '/', label: 'Dashboard', shortcut: 'g d', implemented: true, blurb: 'Queue, recent runs and open investigations.' },
+  { path: '/experiments', label: 'Experiments', shortcut: 'g e', implemented: true, blurb: 'Every experiment, searchable.' },
+  { path: '/labs/jvm', label: 'JVM Lab', shortcut: 'g j', lab: 'JVM', implemented: false, phase: 5, blurb: 'JIT warm-up, allocation, GC and lock profiling with Java Flight Recorder.' },
+  { path: '/labs/concurrency', label: 'Concurrency Lab', shortcut: 'g c', lab: 'CONCURRENCY', implemented: true, blurb: 'Races, deadlocks and visibility bugs — under stress and under a controlled scheduler.' },
+  { path: '/labs/database', label: 'Database Studio', shortcut: 'g b', lab: 'DATABASE', implemented: false, phase: 4, blurb: 'PostgreSQL plans, indexes, pagination strategies and lock contention on seeded data.' },
+  { path: '/labs/failure', label: 'Failure Lab', shortcut: 'g f', lab: 'FAILURE', implemented: false, phase: 6, blurb: 'Bounded fault injection — latency, errors, refusals — against local services only.' },
+  { path: '/labs/algorithms', label: 'Algorithm Lab', shortcut: 'g a', lab: 'ALGORITHMS', implemented: true, blurb: 'How data-structure choices behave on real hardware, measured with JMH.' },
+  { path: '/challenges', label: 'Challenge Arena', shortcut: 'g h', implemented: false, phase: 8, blurb: 'Measurable engineering problems verified by tests and recorded evidence.' },
+  { path: '/investigator', label: 'AI Investigator', shortcut: 'g i', implemented: false, phase: 7, blurb: 'Evidence-grounded analysis of your runs, with citations, through a pluggable model provider.' },
+  { path: '/notebook', label: 'Experiment Notebook', shortcut: 'g n', implemented: true, blurb: 'Your archive of investigations, decisions and reports.' },
+]
+
+export const LAB_LABEL: Record<Lab, string> = {
+  PERFORMANCE: 'Performance',
+  JVM: 'JVM',
+  CONCURRENCY: 'Concurrency',
+  DATABASE: 'Database',
+  FAILURE: 'Failure',
+  ALGORITHMS: 'Algorithms',
+}

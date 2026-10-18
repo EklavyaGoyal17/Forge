@@ -1,0 +1,57 @@
+# FORGE local deployment.
+#   docker compose up --build          → UI + API on http://127.0.0.1:8090
+#   docker compose up -d postgres      → database only, for `mvn spring-boot:run` + `npm run dev`
+#
+# Every published port is bound to 127.0.0.1: FORGE has no authentication (docs/SECURITY.md).
+name: forge
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: forge
+      POSTGRES_USER: forge
+      POSTGRES_PASSWORD: ${FORGE_DB_PASSWORD:-forge}
+    ports:
+      - "127.0.0.1:5442:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forge -d forge"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    security_opt:
+      - no-new-privileges:true
+    restart: unless-stopped
+
+  server:
+    build:
+      context: .
+      dockerfile: docker/server.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      FORGE_DB_URL: jdbc:postgresql://postgres:5432/forge
+      FORGE_DB_USER: forge
+      FORGE_DB_PASSWORD: ${FORGE_DB_PASSWORD:-forge}
+      # inside the container the server must listen on all interfaces; the host port below is loopback-only
+      FORGE_BIND_ADDRESS: 0.0.0.0
+    ports:
+      - "127.0.0.1:8090:8090"
+    # Hardening (docs/SECURITY.md §2). Runner JVMs are children of this container and inherit these limits.
+    read_only: true
+    tmpfs:
+      - /tmp:size=1g,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 1024
+    mem_limit: 3g
+    cpus: 4
+    restart: unless-stopped
+
+volumes:
+  pgdata:

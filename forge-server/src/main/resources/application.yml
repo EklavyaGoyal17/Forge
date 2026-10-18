@@ -1,0 +1,47 @@
+spring:
+  application:
+    name: forge
+  datasource:
+    url: ${FORGE_DB_URL:jdbc:postgresql://127.0.0.1:5442/forge}
+    username: ${FORGE_DB_USER:forge}
+    password: ${FORGE_DB_PASSWORD:forge}
+    hikari:
+      maximum-pool-size: 10
+  threads:
+    virtual:
+      enabled: false
+
+server:
+  # Loopback only: FORGE has no authentication (see docs/SECURITY.md).
+  address: ${FORGE_BIND_ADDRESS:127.0.0.1}
+  port: ${FORGE_PORT:8090}
+  error:
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+forge:
+  version: @project.version@
+  runner:
+    # Classpath of the runner JVM. Empty = reuse this server's classpath (development and tests).
+    # Production images set this to the shaded forge-lab runner jar only.
+    classpath: ${FORGE_RUNNER_CLASSPATH:}
+    java-executable: ${FORGE_RUNNER_JAVA:}
+    work-root: ${FORGE_RUNNER_WORK_ROOT:}
+    max-concurrent-runs: 1
+    queue-capacity: 25
+    default-heap-mb: 256
+    max-heap-mb: 1024
+    max-timeout-seconds: 600
+    active-processor-count: 0
+    stdout-cap-bytes: 16777216
+    stderr-cap-bytes: 262144
+    artifact-cap-bytes: 1048576
+    max-artifacts-per-run: 20
+    keep-work-dirs: false
+
+# Structured (JSON) logs: set LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs (or logstash).

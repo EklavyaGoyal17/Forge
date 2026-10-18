@@ -1,0 +1,9 @@
+**/target
+**/node_modules
+forge-ui/dist
+.git
+.github
+.claude
+.idea
+.vscode
+*.log

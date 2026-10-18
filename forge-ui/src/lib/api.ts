@@ -1,0 +1,367 @@
+// Types mirror the server's JSON exactly. Numbers that may be NaN arrive as the string "NaN".
+
+export type Lab = 'PERFORMANCE' | 'JVM' | 'CONCURRENCY' | 'DATABASE' | 'FAILURE' | 'ALGORITHMS'
+export type Direction = 'LOWER_IS_BETTER' | 'HIGHER_IS_BETTER' | 'NEUTRAL'
+export type Num = number | 'NaN'
+
+export interface ParameterSpec {
+  name: string
+  label: string
+  type: 'INTEGER' | 'ENUM' | 'BOOLEAN'
+  defaultValue: number | string | boolean
+  min: number | null
+  max: number | null
+  options: string[]
+  unit: string | null
+  description: string
+  appliesToModes: string[]
+}
+
+export interface VariantSpec {
+  id: string
+  label: string
+  description: string
+  expectedCorrect: boolean | null
+  sourceRef: string
+}
+
+export interface MetricSpec {
+  name: string
+  label: string
+  unit: string
+  direction: Direction
+  description: string
+}
+
+export interface ScenarioDescriptor {
+  id: string
+  version: number
+  lab: Lab
+  title: string
+  summary: string
+  question: string
+  invariant: string | null
+  parameters: ParameterSpec[]
+  variants: VariantSpec[]
+  metrics: MetricSpec[]
+  primaryMetric: string
+  trials: { defaultTrials: number; maxTrials: number; defaultWarmup: number; maxWarmup: number }
+  defaultTimeoutSeconds: number
+  explanation: string
+  caveats: string[]
+}
+
+export interface ScenarioView {
+  descriptor: ScenarioDescriptor
+  sources: Record<string, string>
+}
+
+export type ExperimentStatus = 'OPEN' | 'CONCLUDED' | 'ARCHIVED'
+
+export interface Experiment {
+  id: string
+  title: string
+  question: string
+  hypothesis: string
+  hypothesisUpdatedAt: string
+  scenarioId: string
+  status: ExperimentStatus
+  observations: string
+  alternativeExplanations: string
+  decision: string
+  followUps: string
+  reviewAnswers: Record<string, string>
+  tags: string[]
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ExperimentSummary {
+  experiment: Experiment
+  runCount: number
+  succeededRuns: number
+  lastRunAt: string | null
+}
+
+export type RunStatus = 'QUEUED' | 'RUNNING' | 'SUCCEEDED' | 'FAILED' | 'TIMED_OUT' | 'CANCELLED'
+export type RunRole = 'BASELINE' | 'CANDIDATE' | 'EXPLORATORY'
+
+export interface Trial {
+  index: number
+  metrics: Record<string, Num>
+  invariantHeld: boolean | null
+  note: string | null
+}
+
+export interface ExplorerStep {
+  index: number
+  thread: string
+  kind: string
+  target: string
+  detail: string
+  outcome: string | null
+}
+
+export interface ExplorerTrace {
+  outcome: string
+  executionOutcome: string
+  waitFor: string[]
+  totalSteps: number
+  truncated: boolean
+  threads: string[]
+  steps: ExplorerStep[]
+}
+
+export interface ExplorerDetails {
+  schedulesExplored: number
+  exhaustive: boolean
+  maxSchedules: number
+  violations: number
+  deadlocks: number
+  stepLimitHits: number
+  errors: number
+  firstError: string | null
+  outcomes: Record<string, number>
+  expected: number
+  elapsedMs: number
+  counterexample: ExplorerTrace | null
+  passingExample: ExplorerTrace | null
+  granularity: string
+  strategy?: string
+}
+
+export interface JmhDetails {
+  benchmark: string
+  mode: string
+  score: Num
+  scoreError: Num
+  scoreUnit: string
+  confidence99_9: Num[]
+  forks: { fork: number; scores: number[] }[]
+  jmhVersion: string
+}
+
+export interface ScenarioResult {
+  trials: Trial[]
+  invariant: { description: string | null; checked: number; violations: number; held: boolean | null }
+  observations: string[]
+  details: { explorer?: ExplorerDetails; jmh?: JmhDetails; [k: string]: unknown }
+}
+
+export interface Run {
+  id: string
+  experimentId: string
+  seq: number
+  label: string
+  role: RunRole
+  scenarioId: string
+  scenarioVersion: number
+  variant: string
+  params: Record<string, number | string | boolean>
+  seed: number
+  trials: number
+  warmupTrials: number
+  heapMb: number
+  timeoutSeconds: number
+  status: RunStatus
+  statusReason: string | null
+  exitCode: number | null
+  progressDone: number | null
+  progressTotal: number | null
+  progressPhase: string | null
+  environment: Environment | null
+  result: ScenarioResult | null
+  forgeVersion: string
+  cancelRequested: boolean
+  queuedAt: string
+  startedAt: string | null
+  finishedAt: string | null
+}
+
+export interface Environment {
+  runner?: Record<string, unknown> | null
+  host?: Record<string, unknown>
+  launch?: Record<string, unknown>
+}
+
+export interface Summary {
+  n: number
+  mean: Num
+  stddev: Num
+  min: Num
+  max: Num
+  median: Num
+  p90: Num
+  p95: Num
+  p99: Num
+  cv: Num
+}
+
+export interface ArtifactMeta {
+  name: string
+  contentType: string
+  sizeBytes: number
+  createdAt: string
+}
+
+export interface RunView {
+  run: Run
+  summaries: Record<string, Summary>
+  artifacts: ArtifactMeta[]
+}
+
+export interface RunEvent {
+  id: number
+  ts: string
+  level: string
+  message: string
+}
+
+export type Verdict = 'IMPROVEMENT' | 'REGRESSION' | 'NO_DIFFERENCE_DETECTED' | 'NOT_DIRECTIONAL' | 'IDENTICAL'
+
+export interface ComparisonResult {
+  metric: string
+  direction: Direction
+  baseline: Summary
+  candidate: Summary
+  ratioOfMedians: Num
+  ciLow: Num
+  ciHigh: Num
+  relativeChangePercent: Num
+  mannWhitney: { u: number; z: number; pValue: number; probabilityAGreater: number } | null
+  verdict: Verdict
+  interpretation: string
+  warnings: string[]
+}
+
+export interface Difference {
+  field: string
+  label: string
+  baseline: string | null
+  candidate: string | null
+}
+
+export interface ComparisonView {
+  baselineRunId: string
+  candidateRunId: string
+  scenarioId: string
+  baselineVariant: string
+  candidateVariant: string
+  primaryMetric: string | null
+  metrics: { label: string; unit: string; primary: boolean; result: ComparisonResult }[]
+  parameterDifferences: Difference[]
+  environmentDifferences: Difference[]
+  comparabilityWarnings: string[]
+  baselineInvariant: string
+  candidateInvariant: string
+  baselineInvariantHeld: boolean | null
+  candidateInvariantHeld: boolean | null
+}
+
+export type CheckStatus = 'PASS' | 'WARN' | 'FAIL' | 'NOT_APPLICABLE'
+
+export interface Review {
+  checks: { id: string; criterion: string; status: CheckStatus; evidence: string }[]
+  passed: number
+  applicable: number
+  questions: { id: string; text: string; hint: string }[]
+  baselineRunId: string | null
+  candidateRunId: string | null
+  rubricNote: string
+}
+
+export interface SystemView {
+  host: Record<string, unknown>
+  limits: {
+    maxConcurrentRuns: number
+    queueCapacity: number
+    defaultHeapMb: number
+    maxHeapMb: number
+    maxTimeoutSeconds: number
+    activeProcessorCount: number
+    stdoutCapBytes: number
+  }
+  pendingRuns: number
+  queuedRuns: number
+  scenarios: number
+  isolation: string
+}
+
+export interface FieldError {
+  field: string
+  message: string
+}
+
+export class ApiError extends Error {
+  readonly status: number
+  readonly fieldErrors: FieldError[]
+
+  constructor(status: number, message: string, fieldErrors: FieldError[] = []) {
+    super(message)
+    this.status = status
+    this.fieldErrors = fieldErrors
+  }
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await fetch(`/api${path}`, {
+    method,
+    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!res.ok) {
+    let detail = res.statusText
+    let fieldErrors: FieldError[] = []
+    try {
+      const pd = await res.json()
+      detail = pd.detail ?? detail
+      fieldErrors = pd.fieldErrors ?? []
+    } catch {
+      // non-JSON error body
+    }
+    throw new ApiError(res.status, detail, fieldErrors)
+  }
+  if (res.status === 204) return undefined as T
+  const type = res.headers.get('Content-Type') ?? ''
+  return (type.includes('json') ? res.json() : res.text()) as Promise<T>
+}
+
+export interface CreateRunRequest {
+  variant: string
+  params: Record<string, number | string | boolean>
+  seed?: number
+  trials: number
+  warmupTrials: number
+  role: RunRole
+  label?: string
+  heapMb?: number
+  timeoutSeconds?: number
+}
+
+export const api = {
+  system: () => request<SystemView>('GET', '/system'),
+  scenarios: () => request<ScenarioDescriptor[]>('GET', '/scenarios'),
+  scenario: (id: string) => request<ScenarioView>('GET', `/scenarios/${encodeURIComponent(id)}`),
+  experiments: (q?: string, lab?: string) => {
+    const p = new URLSearchParams()
+    if (q) p.set('q', q)
+    if (lab) p.set('lab', lab)
+    const qs = p.toString()
+    return request<ExperimentSummary[]>('GET', `/experiments${qs ? `?${qs}` : ''}`)
+  },
+  experiment: (id: string) => request<{ experiment: Experiment; runs: Run[] }>('GET', `/experiments/${id}`),
+  createExperiment: (body: { title: string; question: string; hypothesis: string; scenarioId: string; tags: string[] }) =>
+    request<Experiment>('POST', '/experiments', body),
+  updateExperiment: (id: string, fields: Partial<Experiment>) => request<Experiment>('PATCH', `/experiments/${id}`, fields),
+  deleteExperiment: (id: string) => request<void>('DELETE', `/experiments/${id}`),
+  createRun: (experimentId: string, body: CreateRunRequest) => request<Run>('POST', `/experiments/${experimentId}/runs`, body),
+  run: (id: string) => request<RunView>('GET', `/runs/${id}`),
+  recentRuns: (limit = 15) => request<Run[]>('GET', `/runs?limit=${limit}`),
+  events: (id: string) => request<RunEvent[]>('GET', `/runs/${id}/events`),
+  cancelRun: (id: string) => request<Run>('POST', `/runs/${id}/cancel`),
+  artifact: (id: string, name: string) => request<string>('GET', `/runs/${id}/artifacts/${encodeURIComponent(name)}`),
+  compare: (baseline: string, candidate: string) =>
+    request<ComparisonView>('GET', `/compare?baseline=${baseline}&candidate=${candidate}`),
+  review: (id: string) => request<Review>('GET', `/experiments/${id}/review`),
+  report: (id: string) => request<string>('GET', `/experiments/${id}/report.md`),
+}

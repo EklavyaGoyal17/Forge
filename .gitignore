@@ -1,0 +1,10 @@
+target/
+node_modules/
+forge-ui/dist/
+*.log
+.idea/
+.vscode/
+*.iml
+.DS_Store
+Thumbs.db
+.env
