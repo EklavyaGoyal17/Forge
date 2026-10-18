@@ -22,8 +22,9 @@ const descriptor: ScenarioDescriptor = {
     { name: 'exploreThreads', label: 'Explored threads', type: 'INTEGER', defaultValue: 2, min: 2, max: 3, options: [], unit: 'threads', description: '', appliesToModes: ['explore'] },
   ],
   variants: [
-    { id: 'unsynchronized', label: 'Plain field', description: 'racy', expectedCorrect: false, sourceRef: 'x#unsynchronized' },
-    { id: 'atomic-cas', label: 'AtomicLong CAS loop', description: 'correct', expectedCorrect: true, sourceRef: 'x#atomic-cas' },
+    { id: 'unsynchronized', label: 'Plain field', description: 'racy', expectedCorrect: false, sourceRef: 'x#unsynchronized', modes: [] },
+    { id: 'atomic-cas', label: 'AtomicLong CAS loop', description: 'correct', expectedCorrect: true, sourceRef: 'x#atomic-cas', modes: [] },
+    { id: 'library-queue', label: 'Library queue', description: 'not instrumented', expectedCorrect: true, sourceRef: 'x#q', modes: ['stress'] },
   ],
   metrics: [{ name: 'throughputMopsPerSec', label: 'Throughput', unit: 'M/s', direction: 'HIGHER_IS_BETTER', description: '' }],
   primaryMetric: 'throughputMopsPerSec',
@@ -90,5 +91,20 @@ describe('RunConfigForm', () => {
     expect(screen.getByLabelText(/Explored threads/)).toBeInTheDocument()
     await userEvent.click(screen.getByRole('button', { name: /queue run/i }))
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ trials: 1, warmupTrials: 0 }))
+  })
+
+  it('disables variants that do not support the selected mode and moves the selection off them', async () => {
+    const onSubmit = vi.fn()
+    render(<RunConfigForm descriptor={descriptor} sources={{}} onSubmit={onSubmit} />)
+    await userEvent.click(screen.getByLabelText(/Library queue/))
+    expect(screen.getByLabelText(/Library queue/)).toBeChecked()
+    await userEvent.click(screen.getByRole('radio', { name: 'explore' }))
+    expect(screen.getByLabelText(/Library queue/)).toBeDisabled()
+    expect(screen.getByLabelText(/Library queue/)).not.toBeChecked()
+    expect(screen.getByText('stress only')).toBeInTheDocument()
+  })
+
+  it('validate() rejects a variant used outside its modes', () => {
+    expect(validate(descriptor, { mode: 'explore', threads: 4, exploreThreads: 2 }, 1, 0, 'library-queue').map((e) => e.field)).toEqual(['variant'])
   })
 })

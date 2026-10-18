@@ -108,6 +108,49 @@ class ConcurrencyScenariosTest {
         });
     }
 
+    @Test
+    void checkThenActBufferOverfillsInExplorerAndLockedBufferDoesNot() throws Exception {
+        Map<String, Object> p = Map.of("mode", "explore", "exploreProducers", 2, "exploreOffers", 1, "exploreCapacity", 1);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> racy = (Map<String, Object>) run("concurrency.backpressure", "check-then-act", p, 1).details().get("explorer");
+        @SuppressWarnings("unchecked")
+        Map<String, Object> locked = (Map<String, Object>) run("concurrency.backpressure", "locked-check-then-act", p, 1).details().get("explorer");
+        assertThat(racy.get("exhaustive")).isEqualTo(true);
+        assertThat((Integer) racy.get("violations")).isPositive();
+        assertThat(racy.get("counterexample").toString()).contains("buffered 2 of capacity 1");
+        assertThat(locked.get("exhaustive")).isEqualTo(true);
+        assertThat(locked.get("violations")).isEqualTo(0);
+        assertThat(locked.get("errors")).isEqualTo(0);
+    }
+
+    /** 4,000 items/s offered against ~1,000 items/s of service: a 4× overload. */
+    private static final Map<String, Object> OVERLOAD = Map.of("mode", "stress", "producers", 2, "ratePerProducer", 2_000,
+            "consumers", 1, "serviceMicros", 1_000, "capacity", 50, "durationMs", 300);
+
+    @ParameterizedTest
+    @ValueSource(strings = {"blocking", "drop-newest", "locked-check-then-act"})
+    void boundedBuffersStayBoundedAndLoseNothingUnderOverload(String variant) throws Exception {
+        ScenarioResult r = run("concurrency.backpressure", variant, OVERLOAD, 2);
+        assertThat(r.invariant().held()).as(r.observations().toString()).isTrue();
+        assertThat(r.trials()).allSatisfy(t -> assertThat(t.metrics().get("maxQueueDepth")).isLessThanOrEqualTo(50.0));
+    }
+
+    @Test
+    void backpressureMovesWaitingToTheProducerWhileSheddingDropsWork() throws Exception {
+        ScenarioResult blocking = run("concurrency.backpressure", "blocking", OVERLOAD, 1);
+        ScenarioResult shedding = run("concurrency.backpressure", "drop-newest", OVERLOAD, 1);
+        assertThat(blocking.trials().getFirst().metrics().get("droppedPercent")).isZero();
+        assertThat(shedding.trials().getFirst().metrics().get("droppedPercent")).isPositive();
+    }
+
+    @Test
+    void uninstrumentedVariantsAreRejectedInExplorerMode() {
+        var d = ScenarioCatalog.find("concurrency.backpressure").orElseThrow().descriptor();
+        var v = ParameterValidator.validate(d, "unbounded", Map.of("mode", "explore"), 1, 0);
+        assertThat(v.errors()).extracting(ParameterValidator.FieldError::field).contains("variant");
+        assertThat(ParameterValidator.validate(d, "check-then-act", Map.of("mode", "explore"), 1, 0).errors()).isEmpty();
+    }
+
     @ParameterizedTest
     @ValueSource(strings = {"volatile", "atomic"})
     void volatileStopFlagIsObserved(String variant) throws Exception {

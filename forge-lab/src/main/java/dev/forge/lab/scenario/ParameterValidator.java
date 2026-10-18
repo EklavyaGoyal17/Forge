@@ -76,6 +76,11 @@ public final class ParameterValidator {
             }
         }
 
+        if (variant != null && out.containsKey("mode")) {
+            d.variant(variant).filter(v -> !v.supportsMode(out.get("mode"))).ifPresent(v -> errors.add(new FieldError(
+                    "variant", "variant '" + v.id() + "' does not support mode '" + out.get("mode") + "'; supported: " + v.modes())));
+        }
+
         ScenarioDescriptor.TrialPolicy policy = d.trials();
         int t = trials == null ? policy.defaultTrials() : trials;
         int w = warmup == null ? policy.defaultWarmup() : warmup;
