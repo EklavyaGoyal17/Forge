@@ -133,7 +133,7 @@ export function HttpLoadView({ details }: { details: HttpLoadDetails }) {
               <Latency value={details.aggregate.client.p90Ms} timeoutMs={c.requestTimeoutMs} />
               <Latency value={details.aggregate.client.p95Ms} timeoutMs={c.requestTimeoutMs} />
               <Latency value={details.aggregate.client.p99Ms} timeoutMs={c.requestTimeoutMs} strong />
-              <td className="num px-2.5 py-1.5">{fmt(p999(details.aggregate.client))}</td>
+              <Latency value={p999(details.aggregate.client)} timeoutMs={c.requestTimeoutMs} />
               <Latency value={details.aggregate.client.maxMs} timeoutMs={c.requestTimeoutMs} />
               <td className="num px-2.5 py-1.5 text-muted">—</td>
               <td className={cx('num px-2.5 py-1.5', totalErrors > 0 && 'text-bad')}>
