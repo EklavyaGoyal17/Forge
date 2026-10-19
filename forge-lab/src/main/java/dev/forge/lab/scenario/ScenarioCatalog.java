@@ -4,6 +4,7 @@ import dev.forge.lab.scenarios.algorithms.LookupScenario;
 import dev.forge.lab.scenarios.concurrency.DeadlockScenario;
 import dev.forge.lab.scenarios.concurrency.LostUpdateScenario;
 import dev.forge.lab.scenarios.concurrency.VisibilityScenario;
+import dev.forge.lab.scenarios.performance.ThreadPoolStarvationScenario;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -23,6 +24,7 @@ public final class ScenarioCatalog {
         register(new DeadlockScenario());
         register(new VisibilityScenario());
         register(new LookupScenario());
+        register(new ThreadPoolStarvationScenario());
     }
 
     private ScenarioCatalog() {
