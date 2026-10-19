@@ -16,6 +16,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -168,6 +169,57 @@ class ExperimentFlowIntegrationTest {
         JsonNode run = awaitTerminal(r.body().get("id").asString(), Duration.ofSeconds(60));
         assertThat(run.get("status").asString()).isEqualTo("TIMED_OUT");
         assertThat(run.get("statusReason").asString()).isNotBlank();
+    }
+
+    @Test
+    void pinnedBaselineGatesEveryOtherRun() throws Exception {
+        String exp = createExperiment("concurrency.lost-update");
+        Map<String, Object> params = Map.of("mode", "stress", "threads", 2, "depositsPerThread", 10_000);
+        String first = call("POST", "/api/experiments/" + exp + "/runs", Map.of(
+                "variant", "atomic-cas", "params", params, "trials", 5, "warmupTrials", 0, "role", "BASELINE")).body().get("id").asString();
+        String same = call("POST", "/api/experiments/" + exp + "/runs", Map.of(
+                "variant", "long-adder", "params", params, "trials", 5, "warmupTrials", 0, "role", "CANDIDATE")).body().get("id").asString();
+        String other = call("POST", "/api/experiments/" + exp + "/runs", Map.of(
+                "variant", "long-adder", "params", Map.of("mode", "stress", "threads", 3, "depositsPerThread", 10_000),
+                "trials", 5, "warmupTrials", 0, "role", "EXPLORATORY")).body().get("id").asString();
+        for (String id : List.of(first, same, other)) {
+            assertThat(awaitTerminal(id, Duration.ofSeconds(90)).get("status").asString()).isEqualTo("SUCCEEDED");
+        }
+
+        JsonNode none = call("GET", "/api/experiments/" + exp + "/regressions", null).body();
+        assertThat(none.get("baselineRunId").isNull()).isTrue();
+        assertThat(none.get("checks").size()).isZero();
+
+        // only a SUCCEEDED run of this experiment can be pinned
+        String foreign = createExperiment("concurrency.lost-update");
+        assertThat(call("PUT", "/api/experiments/" + foreign + "/pinned-baseline", Map.of("runId", first)).status()).isEqualTo(400);
+
+        Response pinned = call("PUT", "/api/experiments/" + exp + "/pinned-baseline", Map.of("runId", first));
+        assertThat(pinned.status()).as(pinned.raw()).isEqualTo(200);
+        assertThat(pinned.body().get("pinnedBaselineRunId").asString()).isEqualTo(first);
+
+        JsonNode report = call("GET", "/api/experiments/" + exp + "/regressions", null).body();
+        assertThat(report.get("baselineRunId").asString()).isEqualTo(first);
+        assertThat(report.get("primaryMetric").asString()).isEqualTo("throughputMopsPerSec");
+        assertThat(report.get("checks").size()).isEqualTo(2);
+        JsonNode sameCheck = report.get("checks").get(0);
+        JsonNode otherCheck = report.get("checks").get(1);
+        assertThat(sameCheck.get("runId").asString()).isEqualTo(same);
+        // timing-dependent: any statistical verdict is acceptable, but never "not comparable"
+        assertThat(sameCheck.get("gate").asString()).isIn("REGRESSION", "IMPROVEMENT", "NO_DIFFERENCE_DETECTED");
+        assertThat(otherCheck.get("gate").asString()).isEqualTo("NOT_COMPARABLE");
+        assertThat(otherCheck.get("reasons").toString()).contains("threads");
+
+        assertThat(call("GET", "/api/experiments/" + exp + "/report.md", null).raw())
+                .contains("## Regression gate: pinned baseline run 1 (atomic-cas)").contains("NOT_COMPARABLE");
+
+        Response unpinned = call("DELETE", "/api/experiments/" + exp + "/pinned-baseline", null);
+        assertThat(unpinned.body().get("pinnedBaselineRunId").isNull()).isTrue();
+        assertThat(call("GET", "/api/experiments/" + exp + "/regressions", null).body().get("checks").size()).isZero();
+
+        // an experiment with a pinned run can still be deleted (run → experiment FK cascades, pin is set null)
+        call("PUT", "/api/experiments/" + exp + "/pinned-baseline", Map.of("runId", first));
+        assertThat(call("DELETE", "/api/experiments/" + exp, null).status()).isEqualTo(204);
     }
 
     @Test

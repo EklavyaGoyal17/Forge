@@ -37,7 +37,8 @@ public class ExperimentRepository {
                 json.read(rs.getString("review_answers")),
                 json.read(rs.getString("tags")),
                 instant(rs.getTimestamp("created_at")),
-                instant(rs.getTimestamp("updated_at")));
+                instant(rs.getTimestamp("updated_at")),
+                rs.getObject("pinned_baseline_run_id", UUID.class));
     }
 
     /** List row with run statistics, used by the notebook and dashboard. */
@@ -112,6 +113,14 @@ public class ExperimentRepository {
         spec[0] = jdbc.sql(sql.toString()).param("id", id);
         fields.forEach((k, v) -> spec[0] = spec[0].param(k, v instanceof String s ? s : json.write(v)));
         spec[0].update();
+    }
+
+    /** Pins {@code runId} as the regression baseline, or clears the pin when it is null. */
+    public void pinBaseline(UUID id, UUID runId) {
+        jdbc.sql("update experiment set pinned_baseline_run_id = cast(:run as uuid), updated_at = now() where id = :id")
+                .param("id", id)
+                .param("run", runId)
+                .update();
     }
 
     public boolean delete(UUID id) {

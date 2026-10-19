@@ -1,11 +1,13 @@
 package dev.forge.server.experiment;
 
 import dev.forge.lab.scenario.ScenarioCatalog;
+import dev.forge.server.analysis.RegressionService;
 import dev.forge.server.analysis.ReportService;
 import dev.forge.server.analysis.ReviewBoard;
 import dev.forge.server.run.RunRecord;
 import dev.forge.server.run.RunRepository;
 import dev.forge.server.run.RunService;
+import dev.forge.server.run.RunStatus;
 import dev.forge.server.web.ApiException;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -20,6 +22,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -46,14 +49,16 @@ public class ExperimentController {
     private final RunService runService;
     private final ReviewBoard reviewBoard;
     private final ReportService reports;
+    private final RegressionService regressions;
 
     public ExperimentController(ExperimentRepository experiments, RunRepository runs, RunService runService,
-                                ReviewBoard reviewBoard, ReportService reports) {
+                                ReviewBoard reviewBoard, ReportService reports, RegressionService regressions) {
         this.experiments = experiments;
         this.runs = runs;
         this.runService = runService;
         this.reviewBoard = reviewBoard;
         this.reports = reports;
+        this.regressions = regressions;
     }
 
     public record CreateExperiment(
@@ -158,6 +163,39 @@ public class ExperimentController {
     @ResponseStatus(HttpStatus.ACCEPTED)
     public RunRecord createRun(@PathVariable UUID id, @RequestBody RunService.CreateRun req) {
         return runService.create(id, req);
+    }
+
+    public record PinBaseline(UUID runId) {
+    }
+
+    /** Pins a succeeded run of this experiment as the baseline that every other run is checked against. */
+    @PutMapping("/{id}/pinned-baseline")
+    public Experiment pinBaseline(@PathVariable UUID id, @RequestBody PinBaseline body) {
+        experiments.find(id).orElseThrow(() -> ApiException.notFound("experiment"));
+        if (body == null || body.runId() == null) {
+            throw ApiException.badRequest("runId is required");
+        }
+        RunRecord run = runs.find(body.runId()).filter(r -> r.experimentId().equals(id))
+                .orElseThrow(() -> ApiException.badRequest("run " + body.runId() + " does not belong to this experiment"));
+        if (run.status() != RunStatus.SUCCEEDED) {
+            throw new ApiException(HttpStatus.CONFLICT, "only a SUCCEEDED run can be pinned as the baseline (run #" + run.seq() + " is " + run.status() + ")");
+        }
+        experiments.pinBaseline(id, run.id());
+        return experiments.find(id).orElseThrow();
+    }
+
+    @DeleteMapping("/{id}/pinned-baseline")
+    public Experiment unpinBaseline(@PathVariable UUID id) {
+        experiments.find(id).orElseThrow(() -> ApiException.notFound("experiment"));
+        experiments.pinBaseline(id, null);
+        return experiments.find(id).orElseThrow();
+    }
+
+    /** Every other succeeded run checked against the pinned baseline; empty when nothing is pinned. */
+    @GetMapping("/{id}/regressions")
+    public RegressionService.Report regressions(@PathVariable UUID id) {
+        Experiment e = experiments.find(id).orElseThrow(() -> ApiException.notFound("experiment"));
+        return regressions.check(e);
     }
 
     @GetMapping("/{id}/review")

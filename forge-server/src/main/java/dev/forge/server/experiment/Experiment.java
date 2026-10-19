@@ -5,7 +5,11 @@ import tools.jackson.databind.JsonNode;
 import java.time.Instant;
 import java.util.UUID;
 
-/** An engineering investigation: one question, one hypothesis, any number of runs. */
+/**
+ * An engineering investigation: one question, one hypothesis, any number of runs.
+ *
+ * @param pinnedBaselineRunId the run every other succeeded run is checked against for regressions, or null
+ */
 public record Experiment(
         UUID id,
         String title,
@@ -21,5 +25,6 @@ public record Experiment(
         JsonNode reviewAnswers,
         JsonNode tags,
         Instant createdAt,
-        Instant updatedAt) {
+        Instant updatedAt,
+        UUID pinnedBaselineRunId) {
 }

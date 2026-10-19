@@ -20,11 +20,13 @@ public class ReportService {
 
     private final ReviewBoard reviewBoard;
     private final ComparisonService comparisons;
+    private final RegressionService regressions;
     private final Json json;
 
-    public ReportService(ReviewBoard reviewBoard, ComparisonService comparisons, Json json) {
+    public ReportService(ReviewBoard reviewBoard, ComparisonService comparisons, RegressionService regressions, Json json) {
         this.reviewBoard = reviewBoard;
         this.comparisons = comparisons;
+        this.regressions = regressions;
         this.json = json;
     }
 
@@ -116,6 +118,27 @@ public class ReportService {
                 md.append("**Comparability warnings**\n\n");
                 cmp.comparabilityWarnings().forEach(w -> md.append("- ").append(w).append("\n"));
                 md.append("\n");
+            }
+        }
+
+        RegressionService.Report gate = regressions.check(e);
+        if (gate.baselineRunId() != null) {
+            md.append("## Regression gate: pinned baseline run ").append(gate.baselineSeq())
+                    .append(" (").append(gate.baselineVariant()).append(")\n\n");
+            if (gate.checks().isEmpty()) {
+                md.append("_No other succeeded run to check._\n\n");
+            } else {
+                md.append("| Run | Variant | Gate | Primary ratio | 95% CI | Reasons |\n|---|---|---|---|---|---|\n");
+                for (RegressionService.Check c : gate.checks()) {
+                    var p = c.primary();
+                    md.append("| ").append(c.seq()).append(" | ").append(c.variant()).append(" | **").append(c.gate()).append("** | ")
+                            .append(p == null ? "—" : num(p.ratioOfMedians())).append(" | ")
+                            .append(p == null ? "—" : "[" + num(p.ciLow()) + ", " + num(p.ciHigh()) + "]").append(" | ")
+                            .append(String.join(" ", c.reasons()).replace("|", "\\|")).append(" |\n");
+                }
+                md.append("\nA run is gated as a regression only when it is comparable with the pinned baseline and the 95% ")
+                        .append("bootstrap interval of the primary metric excludes 1.0 on the worse side, or when it violates an ")
+                        .append("invariant the baseline held.\n\n");
             }
         }
 
