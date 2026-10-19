@@ -49,7 +49,8 @@ fully verified; `[ ]` = not done.
 - [x] Deadlock: nested locks vs ordered locks vs tryLock-with-backoff; JVM deadlock detection with thread dump artifact.
 - [x] Visibility: plain vs volatile stop flag.
 - [x] Every scenario: invariant, broken + fixed implementation, automated verification, explanation.
-- [ ] Bounded queue / backpressure, starvation, livelock (later in phase). *(livelock is already observable: the tryLock explorer reports schedules that exceed the step bound)*
+- [x] Bounded queue / backpressure: unbounded vs blocking vs load shedding under open-loop overload (latency from intended time), plus a check-then-act bounded-buffer race with explorer counterexample.
+- [ ] Starvation and an explicit livelock exercise. *(livelock is already observable: the tryLock explorer reports schedules that exceed the step bound)*
 
 ## Phase 4 — Database studio
 - [ ] Disposable lab database and restricted role; seeded synthetic transaction history.

@@ -1,6 +1,7 @@
 package dev.forge.lab.scenario;
 
 import dev.forge.lab.scenarios.algorithms.LookupScenario;
+import dev.forge.lab.scenarios.concurrency.BackpressureScenario;
 import dev.forge.lab.scenarios.concurrency.DeadlockScenario;
 import dev.forge.lab.scenarios.concurrency.LostUpdateScenario;
 import dev.forge.lab.scenarios.concurrency.VisibilityScenario;
@@ -23,6 +24,7 @@ public final class ScenarioCatalog {
         register(new LostUpdateScenario());
         register(new DeadlockScenario());
         register(new VisibilityScenario());
+        register(new BackpressureScenario());
         register(new LookupScenario());
         register(new ThreadPoolStarvationScenario());
     }

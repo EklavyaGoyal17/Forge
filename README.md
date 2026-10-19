@@ -22,7 +22,7 @@ there are no placeholder charts.
 | Baseline vs candidate comparison: bootstrap CI of ratio of medians, Mann–Whitney U, parameter/environment diffs | ✅ |
 | Engineering Review Board: explicit evidence rubric + reviewer questions | ✅ |
 | Markdown report export (PDF via browser print) | ✅ |
-| **Concurrency Lab** — lost update (6 variants), deadlock (3 variants), visibility (3 variants); stress mode + deterministic interleaving explorer | ✅ |
+| **Concurrency Lab** — lost update (6 variants), deadlock (3), visibility (3), backpressure under overload (5); stress mode + deterministic interleaving explorer | ✅ |
 | **Algorithm Lab** — membership lookup (4 variants) measured with JMH | ✅ |
 | **Performance Lab** — thread-pool starvation: an embedded loopback HTTP service (small blocking pool, 8× pool, non-blocking downstream, virtual threads) under an open-model load; client latency from the intended send time (coordinated-omission corrected, HdrHistogram), server service time and queue wait, Little's-law capacity | ✅ |
 | Web UI: dashboard, experiment workspace, run evidence, compare, notebook, review, command palette, keyboard shortcuts, dark/light | ✅ |

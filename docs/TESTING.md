@@ -36,6 +36,10 @@ Deterministic tests with exact expected counts derived by hand:
   suite does not.
 * Deadlock-free variants complete all transfers and conserve money; nested locks deadlock in the explorer.
 * Volatile/atomic stop flags are observed.
+* Backpressure: blocking, shedding and locked buffers stay within capacity and lose nothing under a
+  4× overload; blocking drops nothing while shedding drops work; the check-then-act buffer overfills
+  in the explorer (exhaustive) while the locked one never does; variants built on uninstrumented
+  `java.util.concurrent` queues are rejected in explorer mode.
 * JMH integration: the lookup benchmark's four variants agree on the hit count for the same data,
   and a real (tiny) JMH run yields one trial per measurement iteration.
 * Catalog: every variant's displayed source resolves from the packaged source and contains the
@@ -87,7 +91,7 @@ bug: the first container build served `index.html` but 404'd every asset.)
 * Formatting of numbers, units, durations and relative time.
 * Lost-update conflict detection used to highlight trace rows (including failed vs successful CAS).
 * Trace rendering of a deadlock with its wait-for cycle.
-* Run configuration form: mode-specific parameters, client-side bounds mirroring the server,
+* Run configuration form: variants disabled outside their supported modes, mode-specific parameters, client-side bounds mirroring the server,
   variant source display, submission payload, explore mode forcing a single trial.
 
 ### Frontend: HTTP load renderer (`forge-ui/src/test/httpLoad.test.tsx`)

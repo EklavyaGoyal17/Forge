@@ -23,6 +23,8 @@ export interface VariantSpec {
   description: string
   expectedCorrect: boolean | null
   sourceRef: string
+  /** Modes this variant supports; empty = all. */
+  modes: string[]
 }
 
 export interface MetricSpec {

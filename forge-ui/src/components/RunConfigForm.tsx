@@ -1,6 +1,6 @@
 import { Play } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import type { CreateRunRequest, FieldError, ParameterSpec, Run, RunRole, ScenarioDescriptor } from '../lib/api'
+import type { CreateRunRequest, FieldError, ParameterSpec, Run, RunRole, ScenarioDescriptor, VariantSpec } from '../lib/api'
 import { Badge, Button, CodeBlock, Field, cx, inputClass } from './ui'
 
 type Values = Record<string, number | string | boolean>
@@ -11,9 +11,15 @@ export function visibleParameters(d: ScenarioDescriptor, values: Values): Parame
   return d.parameters.filter((p) => p.name !== 'mode' && (p.appliesToModes.length === 0 || p.appliesToModes.includes(String(mode))))
 }
 
+export function supportsMode(v: VariantSpec, mode: unknown): boolean {
+  return !v.modes || v.modes.length === 0 || mode === undefined || v.modes.includes(String(mode))
+}
+
 /** Client-side mirror of the server's bounds checks, for immediate feedback. The server re-validates. */
-export function validate(d: ScenarioDescriptor, values: Values, trials: number, warmup: number): FieldError[] {
+export function validate(d: ScenarioDescriptor, values: Values, trials: number, warmup: number, variant?: string): FieldError[] {
   const errors: FieldError[] = []
+  const v = variant === undefined ? undefined : d.variants.find((x) => x.id === variant)
+  if (v && !supportsMode(v, values.mode)) errors.push({ field: 'variant', message: `${v.label} supports ${v.modes.join(', ')} mode only` })
   for (const p of d.parameters) {
     const v = values[p.name]
     if (p.type === 'INTEGER') {
@@ -53,7 +59,7 @@ export function RunConfigForm({ descriptor: d, sources, lastRun, onSubmit, submi
 
   const modeParam = d.parameters.find((p) => p.name === 'mode')
   const visible = useMemo(() => visibleParameters(d, values), [d, values])
-  const clientErrors = validate(d, values, trials, warmup)
+  const clientErrors = validate(d, values, trials, warmup, variant)
   const errors = touched ? clientErrors : []
   const errorFor = (field: string) => errors.concat(serverErrors ?? []).find((e) => e.field === field)?.message
   const selected = d.variants.find((v) => v.id === variant)!
@@ -82,24 +88,31 @@ export function RunConfigForm({ descriptor: d, sources, lastRun, onSubmit, submi
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1 text-[12px] font-medium text-dim">Variant</legend>
         <div className="grid gap-2 sm:grid-cols-2">
-          {d.variants.map((v) => (
+          {d.variants.map((v) => {
+            const usable = supportsMode(v, values.mode)
+            return (
             <label
               key={v.id}
+              title={usable ? undefined : `Not available in ${values.mode} mode: library internals are not instrumented for the explorer`}
               className={cx(
-                'flex cursor-pointer flex-col gap-1 rounded-md border p-2.5 transition-colors',
+                'flex flex-col gap-1 rounded-md border p-2.5 transition-colors',
+                usable ? 'cursor-pointer' : 'cursor-not-allowed opacity-45',
                 variant === v.id ? 'border-accent bg-accent-soft' : 'border-border hover:border-border-strong',
               )}
             >
               <span className="flex items-center gap-2">
-                <input type="radio" name="variant" value={v.id} checked={variant === v.id} onChange={() => setVariant(v.id)} className="accent-[var(--accent)]" />
+                <input type="radio" name="variant" value={v.id} checked={variant === v.id} disabled={!usable} onChange={() => setVariant(v.id)} className="accent-[var(--accent)]" />
                 <span className="text-[13px] font-medium">{v.label}</span>
                 {v.expectedCorrect === false && <Badge tone="bad">broken reference</Badge>}
                 {v.expectedCorrect === true && <Badge tone="ok">expected correct</Badge>}
+                {v.modes?.length > 0 && <Badge>{v.modes.join(' / ')} only</Badge>}
               </span>
               <span className="pl-5 text-[12px] leading-snug text-muted">{v.description}</span>
             </label>
-          ))}
+            )
+          })}
         </div>
+        {errorFor('variant') && <p className="text-[12px] text-bad" role="alert">{errorFor('variant')}</p>}
       </fieldset>
 
       {sources[variant] && <CodeBlock code={sources[variant]} caption={`${selected.label} — the exact code that runs`} />}
@@ -114,7 +127,11 @@ export function RunConfigForm({ descriptor: d, sources, lastRun, onSubmit, submi
                 type="button"
                 role="radio"
                 aria-checked={values.mode === o}
-                onClick={() => setValues((v) => ({ ...v, mode: o }))}
+                onClick={() => {
+                  setValues((v) => ({ ...v, mode: o }))
+                  // keep the selection valid: jump to the first variant that supports the new mode
+                  if (!supportsMode(selected, o)) setVariant(d.variants.find((x) => supportsMode(x, o))?.id ?? variant)
+                }}
                 className={cx('h-7 rounded px-3 text-[13px]', values.mode === o ? 'bg-panel-2 text-text' : 'text-muted hover:text-dim')}
               >
                 {o}
