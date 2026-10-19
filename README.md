@@ -24,8 +24,9 @@ there are no placeholder charts.
 | Markdown report export (PDF via browser print) | ✅ |
 | **Concurrency Lab** — lost update (6 variants), deadlock (3 variants), visibility (3 variants); stress mode + deterministic interleaving explorer | ✅ |
 | **Algorithm Lab** — membership lookup (4 variants) measured with JMH | ✅ |
+| **Performance Lab** — thread-pool starvation: an embedded loopback HTTP service (small blocking pool, 8× pool, non-blocking downstream, virtual threads) under an open-model load; client latency from the intended send time (coordinated-omission corrected, HdrHistogram), server service time and queue wait, Little's-law capacity | ✅ |
 | Web UI: dashboard, experiment workspace, run evidence, compare, notebook, review, command palette, keyboard shortcuts, dark/light | ✅ |
-| Performance lab (HTTP load), Database Studio, JVM lab (JFR), Failure lab, AI investigator, Challenge arena | planned — see [ROADMAP](docs/ROADMAP.md) |
+| Performance lab k6 adapter and pinned-baseline regression detection, Database Studio, JVM lab (JFR), Failure lab, AI investigator, Challenge arena | planned — see [ROADMAP](docs/ROADMAP.md) |
 
 ## Quick start
 
@@ -44,13 +45,21 @@ Then open http://127.0.0.1:8090. PostgreSQL is published on `127.0.0.1:5442`.
 ```bash
 docker compose up -d postgres
 mvn -q install -DskipTests
-FORGE_RUNNER_CLASSPATH=forge-lab/target/forge-lab-0.1.0-SNAPSHOT-runner.jar java -jar forge-server/target/forge-server.jar
+FORGE_RUNNER_CLASSPATH="$PWD/forge-lab/target/forge-lab-0.1.0-SNAPSHOT-runner.jar" java -jar forge-server/target/forge-server.jar
 cd forge-ui && npm install && npm run dev
 ```
 
 Then open http://127.0.0.1:5190 (Vite proxies `/api` to the server on 8090).
 `mvn -pl forge-server spring-boot:run` also works without `FORGE_RUNNER_CLASSPATH`; the runner then
 reuses the development classpath.
+
+`FORGE_RUNNER_CLASSPATH` must be an absolute path: the runner JVM starts in its private per-run
+directory, so a relative path fails with `ClassNotFoundException: RunnerMain`.
+
+Do not point two FORGE servers at the same database (for example the compose container and a
+development server): both claim queued runs, so a run may execute on the other server's runner.
+Give the second server its own database and port, e.g.
+`FORGE_DB_URL=jdbc:postgresql://127.0.0.1:5442/forge_dev FORGE_PORT=8091`.
 
 Ports were chosen to avoid 5173/8080/5433, which other local projects commonly use.
 

@@ -88,7 +88,33 @@ environment or an unstable workload, and comparisons will need more trials.
   invariant, which is a much stronger statement than stress testing, but still not a proof about
   the JVM.
 
-## 6. Generalisation caveats (shown next to results)
+## 6. Load tests (Performance Lab)
+
+* **Open model.** Requests are due on a fixed schedule (constant arrival rate), whether or not
+  earlier ones have completed — the way independent users arrive. A closed model (N users who
+  each wait for a response) automatically slows down when the server does, so it cannot show
+  what overload does to the users who keep arriving.
+* **Latency from the intended send time.** When the generator cannot send on time (all
+  connections busy, a stalled thread), the delay is part of the latency a user would have seen.
+  FORGE records `completed − intended` as *the* client latency and `completed − sent` next to it,
+  so the size of coordinated omission is visible rather than silently removed.
+* **Phases.** Every trial applies the load for a warm-up phase (not measured) and then a
+  sustained phase; requests whose intended send time falls in the sustained phase are measured.
+  Warm-up trials (whole trials discarded) are also available, as for every scenario.
+* **Percentiles.** Per-trial p50/p90/p95/p99/max are trial metrics, compared across runs by their
+  median like any other metric. The run aggregate merges the raw HdrHistograms. A percentile
+  needs at least `1/(1−p)` values to be distinguishable from the maximum (p99.9 needs 1 000);
+  unresolvable percentiles are not shown.
+* **Timeouts** are recorded when the client gives up, so a percentile at the timeout is a lower
+  bound; FORGE says so in the observations and marks such values with `≥`.
+* **Server-side breakdown.** Queue wait and service time are measured by the server. Means (not
+  percentiles) of client latency, queue wait and service time add up; the remainder is time
+  outside the server's measurement (generator lag, loopback I/O, client callbacks).
+* **Shared machine.** Client and server share the JVM, CPU and garbage collector, and both rely on
+  OS timers (coarse on Windows). Absolute numbers over loopback are lower than over a network;
+  the shape — where throughput plateaus and how latency grows past it — is the result.
+
+## 7. Generalisation caveats (shown next to results)
 
 A result holds for: this machine, this JVM, this heap size, this data size and distribution, this
 concurrency level, and this code version. Before acting on it, ask:

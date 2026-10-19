@@ -43,7 +43,7 @@
 
 | Module | Responsibility | Depends on |
 |---|---|---|
-| `forge-lab` | Scenario SPI, built-in scenarios, statistics, runner protocol, `RunnerMain` entry point. Plain Java — **no Spring**, so it is fast to start in a child JVM and easy to unit test. | Jackson 3, JMH |
+| `forge-lab` | Scenario SPI, built-in scenarios, statistics, runner protocol, `RunnerMain` entry point, open-model HTTP load generator. Plain Java — **no Spring**, so it is fast to start in a child JVM and easy to unit test. | Jackson 3, JMH, HdrHistogram |
 | `forge-server` | REST API, persistence (PostgreSQL + Flyway), run orchestration, child-JVM launcher, comparison and report generation, Engineering Review Board rubric. | `forge-lab`, Spring Boot |
 | `forge-ui` (npm) | Developer workstation UI. Renders only data returned by the API. | — |
 
@@ -111,6 +111,25 @@
   *"no difference detected at this sample size"*. Sample sizes under 5 trials produce a warning.
   See `EXPERIMENT_METHODOLOGY.md`.
 
+### ADR-009 — Performance Lab: open model, measured from the intended send time (implemented)
+* **Decision:** HTTP load is generated at a constant arrival rate (`OpenLoopGenerator`) against a
+  target service the scenario starts itself (`TargetService`, the JDK's `com.sun.net.httpserver`
+  bound to 127.0.0.1 on an ephemeral port, inside the runner JVM). Each request's latency is
+  `completed − intended send time`; `completed − actual send time` is recorded alongside it.
+  Latencies go into HdrHistograms (µs, 3 significant digits); per-trial percentiles are stored as
+  trial metrics, and raw histograms are merged (percentiles are never averaged) for the run aggregate.
+* **Why:** a closed-model generator (N users each waiting for a response) slows its own arrival
+  rate when the server slows down, and measuring from the actual send time silently drops the
+  waiting time of the requests hurt most (coordinated omission). Both hide overload. The
+  in-process loopback target makes "no external host can be addressed" structural rather than a
+  configuration rule.
+* **Server-side evidence:** an instrumented executor records queue wait (submitted → started) and
+  how long workers were occupied by measured requests; `workers ÷ occupancy` is the Little's-law
+  capacity bound shown next to the achieved throughput.
+* **Trade-off:** client and server share one JVM, CPU and GC; the generator relies on OS timers
+  (its wake-up lag is reported per trial). Both are stated as caveats on every result.
+* **Not yet:** k6 adapter (`grafana/k6`) and regression detection against a pinned baseline.
+
 ## 4. Technology choices
 
 | Choice | Why | Trade-off |
@@ -169,7 +188,7 @@ explicit and reviewable.
 
 | Component | Phase | Notes |
 |---|---|---|
-| HTTP load generator (open model, coordinated-omission aware, HdrHistogram) + embedded target service | 2 | Target bound to loopback inside the child JVM, so no external host can be addressed. k6 adapter via the `grafana/k6` image when Docker is available. |
+| Performance Lab additions | 2 | k6 adapter via the `grafana/k6` image (when Docker is available) against the same loopback target; regression detection against a pinned baseline run. The open-model generator and embedded target are implemented (ADR-009). |
 | Database Studio | 4 | Disposable `forge_lab` database, separate role with no access to platform tables, seeded data generation, `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` capture. |
 | JVM Lab | 5 | JFR recording (`-XX:StartFlightRecording`) in the child JVM, parsed with `jdk.jfr.consumer`. |
 | Failure Lab | 6 | Fault-injecting proxy in front of embedded downstream services. |

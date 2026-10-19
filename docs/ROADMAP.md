@@ -7,7 +7,7 @@ or a recorded manual check. Status values: `done`, `in progress`, `not started`.
 |---|---|---|
 | 0 | Architecture & documentation | done |
 | 1 | Working experiment platform | done (CI workflow not yet executed on GitHub) |
-| 2 | Performance lab (HTTP) | not started |
+| 2 | Performance lab (HTTP) | in progress (core done; k6 adapter and pinned-baseline regression detection not started) |
 | 3 | Concurrency lab | in progress (core exercises done) |
 | 4 | Database studio | not started |
 | 5 | JVM lab | not started |
@@ -35,10 +35,10 @@ fully verified; `[ ]` = not done.
 - [~] CI workflow runs backend and frontend tests. *(written; the same commands pass locally; not yet executed on GitHub — no remote configured)*
 
 ## Phase 2 — Performance lab
-- [ ] Open-model (constant arrival rate) HTTP load generator with coordinated-omission-correct latency (HdrHistogram).
-- [ ] Embedded loopback target service with configurable CPU work, blocking I/O, and worker-pool size.
-- [ ] Client-observed latency vs server-side service time vs queue wait reported separately.
-- [ ] Warm-up and sustained phases, repeated trials, p50/p90/p95/p99, error rate.
+- [x] Open-model (constant arrival rate) HTTP load generator with coordinated-omission-correct latency (HdrHistogram). *(`OpenLoopGeneratorTest`: virtual-clock server stall with hand-derived p99 — 1 ms from actual send vs 910 ms from intended send)*
+- [x] Embedded loopback target service with configurable CPU work, blocking I/O, and worker-pool size. *(bound to 127.0.0.1 on an ephemeral port inside the runner JVM, checked at start-up; four designs: small blocking pool, 8× pool, non-blocking downstream, virtual threads)*
+- [x] Client-observed latency vs server-side service time vs queue wait reported separately. *(plus worker time per request and the Little's-law capacity it implies)*
+- [x] Warm-up and sustained phases, repeated trials, p50/p90/p95/p99, error rate. *(`PerformanceScenarioTest` checks structure and request accounting. Recorded end-to-end check on 2026-10-19 through the API on the development machine: at 300 req/s, 4 workers and a 20 ms downstream, the blocking pool completed a median of 188 req/s against a Little's-law bound of 188 req/s, and its p99 reached the 2 s timeout while a send-time measurement reported 346 ms; the non-blocking design completed 300 req/s with p99 24.5 ms)*
 - [ ] k6 adapter (`grafana/k6` container) against the same target when Docker is available.
 - [ ] Regression detection against a pinned baseline.
 

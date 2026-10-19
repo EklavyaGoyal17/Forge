@@ -42,6 +42,23 @@ Deterministic tests with exact expected counts derived by hand:
   real implementation; descriptor defaults validate; the validator rejects out-of-range, unknown
   and wrongly-typed input.
 
+### Performance measurement (`forge-lab/.../performance/*Test`, `scenarios/PerformanceScenarioTest`)
+* The open-model generator runs on a **virtual clock** against a fake one-connection server, so
+  every latency is exact. A 1 s server stall at 100 req/s gives p99 = 1 ms measured from the actual
+  send time but 910 ms from the intended send time (derived by hand in the test), and exactly 111
+  requests ≥ 10 ms.
+* Warm-up requests are sent but not measured; a response slower than the timeout is a timeout
+  recorded at the timeout; requests that cannot get a connection before their deadline are
+  timeouts that were never sent; per-window series counts.
+* The arrival schedule does not drift for non-integer intervals (3 req/s lands exactly on 1 s; an
+  hour at 300 req/s lands exactly on the hour).
+* HdrHistogram summaries against known data within the histogram's precision; percentiles a
+  sample cannot resolve are flagged.
+* The scenario test makes short real runs of all four server designs and asserts only structure
+  and accounting (scheduled/measured counts, every measured request accounted for, loopback bind
+  address, worker counts) — never latency or throughput values, which depend on the machine.
+* Parameter bounds keep the load small; a run whose trials cannot finish before the deadline is refused.
+
 ### Runner protocol (`forge-lab/.../runner/RunnerProcessTest`)
 Launches `RunnerMain` as a real child process: a valid spec produces a result with environment
 and JVM flags; invalid parameters, unknown scenarios and non-JSON input exit with code 2 without
@@ -72,6 +89,19 @@ bug: the first container build served `index.html` but 404'd every asset.)
 * Trace rendering of a deadlock with its wait-for cycle.
 * Run configuration form: mode-specific parameters, client-side bounds mirroring the server,
   variant source display, submission payload, explore mode forcing a single trial.
+
+### Frontend: HTTP load renderer (`forge-ui/src/test/httpLoad.test.tsx`)
+* Per-trial client percentile table plus the merged-histogram row; error counts; p99.9 hidden when
+  a trial has fewer than 1 000 values; values at the request timeout marked as lower bounds.
+* The percentile spectrum joins series by percentile and drops unresolvable points; per-window
+  counts become rates; virtual threads are labelled as having no pool.
+
+### Recorded end-to-end check (Performance Lab, 2026-10-19)
+Through the HTTP API on a development server with its own database: baseline `blocking-pool` and
+candidate `async` at default parameters (5 trials + 1 warm-up), then `virtual-threads` and another
+`blocking-pool` run. All succeeded in the isolated runner; the comparison reported an improvement
+in the primary metric (client p99) with a bootstrap interval excluding 1.0, and the run detail
+rendered its tables and charts from the stored result (checked in a browser through the DOM).
 
 ## Known gaps
 * No browser end-to-end tests (Playwright) yet — planned for phase 9.

@@ -11,7 +11,7 @@ contained. Read the "Residual risks" section before exposing FORGE to anyone but
 | Developer machine stability | Runaway CPU/memory/threads from an experiment | Child JVM with `-Xmx`, `-Xss`, `-XX:ActiveProcessorCount`, `-XX:+ExitOnOutOfMemoryError`, wall-clock timeout, process-tree kill |
 | FORGE's own data | Experiment code writing to platform tables | Child JVM receives no database credentials; empty environment |
 | Host secrets | Env vars (`AWS_*`, tokens), home-directory files | Environment cleared before launch; working directory and `java.io.tmpdir` set to a private per-run directory |
-| Other hosts on the network | Load tests or fault injection aimed at real services | No user-supplied targets in current phases; HTTP targets (Phase 2) are embedded services bound to loopback inside the child JVM; any future external target requires an explicit allowlist entry |
+| Other hosts on the network | Load tests or fault injection aimed at real services | No user-supplied targets; the Performance Lab's HTTP target is an embedded service the scenario starts inside the child JVM, bound to 127.0.0.1 on an ephemeral port (verified at start-up), and its load is bounded (≤ 2 000 req/s, ≤ 256 connections, ≤ 10 s sustained per trial, ≤ 13 trials); any future external target requires an explicit allowlist entry |
 | Server availability | Many queued runs, oversized outputs | Bounded queue, serial execution, stdout/stderr byte caps, parameter bounds |
 | Browser users | XSS through artifacts | Artifacts served as `text/plain` with `X-Content-Type-Options: nosniff`; UI renders text, never HTML from results |
 
