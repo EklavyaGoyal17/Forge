@@ -76,6 +76,8 @@ export interface Experiment {
   tags: string[]
   createdAt: string
   updatedAt: string
+  /** run every other succeeded run is checked against for regressions */
+  pinnedBaselineRunId: string | null
 }
 
 export interface ExperimentSummary {
@@ -316,6 +318,26 @@ export interface ComparisonResult {
   warnings: string[]
 }
 
+export type RegressionGate = 'REGRESSION' | 'IMPROVEMENT' | 'NO_DIFFERENCE_DETECTED' | 'IDENTICAL' | 'NOT_DIRECTIONAL' | 'NOT_COMPARABLE'
+
+export interface RegressionCheck {
+  runId: string
+  seq: number
+  variant: string
+  gate: RegressionGate
+  reasons: string[]
+  primary: ComparisonResult | null
+  otherRegressedMetrics: string[]
+}
+
+export interface RegressionReport {
+  baselineRunId: string | null
+  baselineSeq: number | null
+  baselineVariant: string | null
+  primaryMetric: string | null
+  checks: RegressionCheck[]
+}
+
 export interface Difference {
   field: string
   label: string
@@ -445,5 +467,8 @@ export const api = {
   compare: (baseline: string, candidate: string) =>
     request<ComparisonView>('GET', `/compare?baseline=${baseline}&candidate=${candidate}`),
   review: (id: string) => request<Review>('GET', `/experiments/${id}/review`),
+  pinBaseline: (id: string, runId: string) => request<Experiment>('PUT', `/experiments/${id}/pinned-baseline`, { runId }),
+  unpinBaseline: (id: string) => request<Experiment>('DELETE', `/experiments/${id}/pinned-baseline`),
+  regressions: (id: string) => request<RegressionReport>('GET', `/experiments/${id}/regressions`),
   report: (id: string) => request<string>('GET', `/experiments/${id}/report.md`),
 }

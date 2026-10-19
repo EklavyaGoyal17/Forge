@@ -1,14 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ChevronDown, ChevronRight, Download, Trash2 } from 'lucide-react'
+import { ChevronDown, ChevronRight, Download, Pin, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ComparePanel } from '../components/ComparePanel'
 import { NotebookPanel } from '../components/NotebookPanel'
+import { GateBadge, RegressionPanel } from '../components/RegressionPanel'
 import { ReviewPanel } from '../components/ReviewPanel'
 import { RunConfigForm } from '../components/RunConfigForm'
 import { RunDetail } from '../components/RunDetail'
 import { Badge, Button, Card, EmptyState, InvariantBadge, Markdownish, StatusPill, Tabs, cx } from '../components/ui'
-import type { CreateRunRequest, Experiment, ExperimentStatus, Run, ScenarioDescriptor } from '../lib/api'
+import type { CreateRunRequest, Experiment, ExperimentStatus, RegressionCheck, Run, ScenarioDescriptor } from '../lib/api'
 import { ApiError, api } from '../lib/api'
 import { duration, fmt, relativeTime, runDuration } from '../lib/format'
 import { LAB_LABEL } from '../lib/labs'
@@ -154,6 +155,19 @@ function RunsWorkbench({ experiment, runs, descriptor, sources }: { experiment: 
     },
   })
   const serverErrors = create.error instanceof ApiError ? create.error.fieldErrors : undefined
+  const pinnedId = experiment.pinnedBaselineRunId
+  const runsKey = runs.map((r) => `${r.id}:${r.status}`).join(',')
+  const regressions = useQuery({
+    queryKey: ['regressions', experiment.id, pinnedId, runsKey],
+    queryFn: () => api.regressions(experiment.id),
+    enabled: Boolean(pinnedId),
+  })
+  const pin = useMutation({
+    mutationFn: (runId: string | null) => (runId ? api.pinBaseline(experiment.id, runId) : api.unpinBaseline(experiment.id)),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['experiment', experiment.id] }),
+  })
+  const checks = new Map((pinnedId ? regressions.data?.checks ?? [] : []).map((c) => [c.runId, c]))
+  const selectedRun = runs.find((r) => r.id === selected)
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(420px,0.85fr)_1.4fr]">
@@ -182,18 +196,30 @@ function RunsWorkbench({ experiment, runs, descriptor, sources }: { experiment: 
               Start with a <strong>baseline</strong>: the implementation you want to improve. Then run the candidate with identical parameters so that the variant is the only difference.
             </EmptyState>
           ) : (
-            <RunList runs={runs} descriptor={descriptor} selected={selected} onSelect={setSelected} />
+            <RunList runs={runs} descriptor={descriptor} selected={selected} onSelect={setSelected} pinnedId={pinnedId} checks={checks} />
           )}
+          {pinnedId && regressions.data && <div className="border-t border-border"><RegressionPanel report={regressions.data} /></div>}
         </Card>
       </div>
       <Card title={selected ? 'Evidence' : undefined}>
-        {selected ? <RunDetail key={selected} runId={selected} descriptor={descriptor} /> : <EmptyState title="Select a run">Each run's measurements, timeline, raw artifacts and environment appear here.</EmptyState>}
+        {selected ? (
+          <RunDetail
+            key={selected}
+            runId={selected}
+            descriptor={descriptor}
+            pin={selectedRun?.status === 'SUCCEEDED' ? {
+              pinned: pinnedId === selected,
+              busy: pin.isPending,
+              onToggle: () => pin.mutate(pinnedId === selected ? null : selected),
+            } : undefined}
+          />
+        ) : <EmptyState title="Select a run">Each run's measurements, timeline, raw artifacts and environment appear here.</EmptyState>}
       </Card>
     </div>
   )
 }
 
-function RunList({ runs, descriptor, selected, onSelect }: { runs: Run[]; descriptor: ScenarioDescriptor; selected?: string; onSelect: (id: string) => void }) {
+function RunList({ runs, descriptor, selected, onSelect, pinnedId, checks }: { runs: Run[]; descriptor: ScenarioDescriptor; selected?: string; onSelect: (id: string) => void; pinnedId: string | null; checks: Map<string, RegressionCheck> }) {
   const primary = descriptor.metrics.find((m) => m.name === descriptor.primaryMetric)
   const rows = useMemo(() => [...runs].reverse(), [runs])
   return (
@@ -216,6 +242,8 @@ function RunList({ runs, descriptor, selected, onSelect }: { runs: Run[]; descri
                   <span className="num truncate text-[13px]">{r.variant}</span>
                   <Badge tone={r.role === 'BASELINE' ? 'info' : r.role === 'CANDIDATE' ? 'accent' : 'neutral'}>{r.role.toLowerCase()}</Badge>
                   {explore && <Badge>explore</Badge>}
+                  {pinnedId === r.id && <span className="inline-flex items-center gap-1 text-[11px] text-info" title="Pinned regression baseline"><Pin size={11} aria-hidden /> pinned baseline</span>}
+                  {checks.get(r.id) && <GateBadge check={checks.get(r.id)!} />}
                 </span>
                 <span className="mt-0.5 flex items-center gap-2 text-[12px] text-muted">
                   {r.status === 'SUCCEEDED' && !explore && median !== undefined && primary && <span className="num">{fmt(median)} {primary.unit} median</span>}

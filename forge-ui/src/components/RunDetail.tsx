@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { FileText, Square } from 'lucide-react'
+import { FileText, Pin, PinOff, Square } from 'lucide-react'
 import { useState } from 'react'
 import type { MetricSpec, RunView, ScenarioDescriptor, Summary } from '../lib/api'
 import { api } from '../lib/api'
@@ -13,7 +13,14 @@ type Tab = 'results' | 'timeline' | 'artifacts' | 'environment' | 'config'
 
 const TERMINAL = new Set(['SUCCEEDED', 'FAILED', 'TIMED_OUT', 'CANCELLED'])
 
-export function RunDetail({ runId, descriptor }: { runId: string; descriptor: ScenarioDescriptor }) {
+/** Pin control for the experiment's regression baseline; only offered for succeeded runs. */
+export interface PinControl {
+  pinned: boolean
+  busy: boolean
+  onToggle: () => void
+}
+
+export function RunDetail({ runId, descriptor, pin }: { runId: string; descriptor: ScenarioDescriptor; pin?: PinControl }) {
   const qc = useQueryClient()
   const [tab, setTab] = useState<Tab>('results')
   const view = useQuery({
@@ -41,6 +48,12 @@ export function RunDetail({ runId, descriptor }: { runId: string; descriptor: Sc
         <span className="num text-[13px] text-dim">{run.variant}</span>
         {run.label && <span className="text-[13px] text-muted">“{run.label}”</span>}
         <div className="flex-1" />
+        {pin && run.status === 'SUCCEEDED' && (
+          <Button variant={pin.pinned ? 'primary' : 'secondary'} onClick={pin.onToggle} disabled={pin.busy}
+            title={pin.pinned ? 'Stop checking other runs against this one' : 'Check every other succeeded run of this experiment against this one'}>
+            {pin.pinned ? <><PinOff size={13} /> Unpin baseline</> : <><Pin size={13} /> Pin as baseline</>}
+          </Button>
+        )}
         {active && (
           <Button variant="danger" onClick={() => cancel.mutate()} disabled={cancel.isPending || run.cancelRequested}>
             <Square size={13} /> {run.cancelRequested ? 'Cancelling…' : 'Cancel'}
