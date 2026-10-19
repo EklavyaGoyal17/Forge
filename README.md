@@ -6,7 +6,7 @@
 
 FORGE is a personal engineering laboratory for studying how real code behaves: you state a
 hypothesis, run a parameterised experiment in an isolated JVM, and inspect the evidence — per-trial
-measurements, invariant checks, controlled-schedule traces, JMH data, thread dumps, and the exact
+measurements, invariant checks, controlled-schedule traces, JMH data, JFR profiles, thread dumps, and the exact
 environment — then compare a candidate against a baseline with honest statistics.
 
 Every number FORGE shows comes from a run you can inspect. Modules that do not exist yet say so;
@@ -27,8 +27,9 @@ there are no placeholder charts.
 | **Algorithm Lab** — membership lookup (4 variants) measured with JMH | ✅ |
 | **Database Studio** — disposable PostgreSQL lab database with a restricted role; seeded transaction history per run; index on/off, OFFSET vs keyset pagination, N+1, and SQL lost updates under isolation levels and row locks; EXPLAIN (ANALYZE, BUFFERS) plan trees | ✅ |
 | **Performance Lab** — thread-pool starvation: an embedded loopback HTTP service (small blocking pool, 8× pool, non-blocking downstream, virtual threads) under an open-model load; client latency from the intended send time (coordinated-omission corrected, HdrHistogram), server service time and queue wait, Little's-law capacity | ✅ |
+| **JVM Lab** — Java Flight Recorder recorded inside the runner JVM and summarised there (hot methods with interpreted/compiled frames, allocation by class and site, GC pauses, contended monitors and parked locks); JIT warm-up from the first call in tiered / C1-only / C2-only / interpreter modes with each compilation placed on the invocation axis; allocation-heavy vs allocation-light implementations with exact per-thread allocation counts; lock contention (synchronized vs ReentrantLock vs per-thread state) | ✅ |
 | Web UI: dashboard, experiment workspace, run evidence, compare, notebook, review, command palette, keyboard shortcuts, dark/light | ✅ |
-| Performance lab k6 adapter (deferred by design), JVM lab (JFR), Failure lab, AI investigator, Challenge arena | planned — see [ROADMAP](docs/ROADMAP.md) |
+| Performance lab k6 adapter (deferred by design), Failure lab, AI investigator, Challenge arena | planned — see [ROADMAP](docs/ROADMAP.md) |
 
 ## Quick start
 

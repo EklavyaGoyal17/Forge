@@ -145,7 +145,34 @@ against it with the comparison above. The gate is conservative:
 * **Correctness first.** Pagination, N+1 and lost-update scenarios carry invariants (identical
   pages, identical loaded graphs, no lost deposits) checked in every trial.
 
-## 8. Generalisation caveats (shown next to results)
+## 8. JVM experiments (JVM Lab)
+
+* **Sampled vs exact.** JFR's CPU and allocation views are statistical: an execution sample every
+  10 ms per thread running Java code, at most 300 allocation samples per second. They answer
+  *where*; totals come from exact counters recorded next to them — HotSpot's per-thread allocated
+  bytes (`ThreadMXBean.getCurrentThreadAllocatedBytes`) and the JVM's BLOCKED/WAITING counts
+  (thread contention monitoring). The run shows both, so their agreement can be checked (a recorded
+  boxed-stream run: 1,927 MB sampled vs 1,999 MB exact; `String +=`: 1,265 MB vs 2,762 MB, because
+  its bursts exceed the sampling rate).
+* **Allocation sample weights.** A sample's weight is the bytes its thread allocated since its
+  previous sample. Each thread's first sample in a recording is discarded (its weight reaches back to
+  before the recording), and a weight that accumulated while the sampler was rate-limited lands on
+  the next sample, which can be in different code.
+* **Thresholds make lower bounds.** Only lock waits at or above the threshold (0.1 ms in the
+  contention scenario) become JFR events; spinning that succeeds is invisible to every counter.
+* **The measured window.** Tables count events between the first and last JFR marker (the measured
+  trials), so JFR's own start-up and dump code is not attributed to the scenario.
+* **Warm-up is per method.** Every warm-up trial loads a fresh copy of the kernel class, so its
+  methods start interpreted with no profile. The JDK code it calls and the compiler threads are
+  shared with earlier trials. Compilation events are placed on the invocation axis through markers
+  carrying `System.nanoTime()`; "code available from invocation *k*" means the first invocation that
+  *started* after the compilation finished. On-stack replacement (OSR) code is used only by a loop
+  that is already running, so a later invocation can still enter the method interpreted.
+* **JIT-mode flags change the whole JVM**, including JFR's own code and the summariser, and the
+  compile thresholds differ between JDK versions — compare modes on one JDK only (the version is
+  part of the environment comparison).
+
+## 9. Generalisation caveats (shown next to results)
 
 A result holds for: this machine, this JVM, this heap size, this data size and distribution, this
 concurrency level, and this code version. Before acting on it, ask:

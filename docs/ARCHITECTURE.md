@@ -43,7 +43,7 @@
 
 | Module | Responsibility | Depends on |
 |---|---|---|
-| `forge-lab` | Scenario SPI, built-in scenarios, statistics, runner protocol, `RunnerMain` entry point, open-model HTTP load generator, Database Studio helpers (per-run schema, seeded data, EXPLAIN capture). Plain Java — **no Spring**, so it is fast to start in a child JVM and easy to unit test. | Jackson 3, JMH, HdrHistogram, PostgreSQL JDBC |
+| `forge-lab` | Scenario SPI, built-in scenarios, statistics, runner protocol, `RunnerMain` entry point, open-model HTTP load generator, Database Studio helpers (per-run schema, seeded data, EXPLAIN capture), JVM Lab helpers (JFR capture and summary with `jdk.jfr`). Plain Java — **no Spring**, so it is fast to start in a child JVM and easy to unit test. | Jackson 3, JMH, HdrHistogram, PostgreSQL JDBC |
 | `forge-server` | REST API, persistence (PostgreSQL + Flyway), run orchestration, child-JVM launcher, comparison and report generation, Engineering Review Board rubric. | `forge-lab`, Spring Boot |
 | `forge-ui` (npm) | Developer workstation UI. Renders only data returned by the API. | — |
 
@@ -152,6 +152,37 @@
   the per-run seed (the first implementation) silently gave every run different data; making the
   dataset part of the configuration turns a different dataset into a visible parameter difference.
 
+### ADR-011 — JVM Lab: JFR recorded by the scenario, summarised in the runner (implemented)
+* **Decision:** JVM Lab scenarios start a `jdk.jfr.Recording` programmatically (`JfrCapture`)
+  around their measured trials, write it into the run's private work directory, parse it there with
+  `jdk.jfr.consumer.RecordingFile` (`JfrSummariser`) and return only bounded summary tables in
+  `ScenarioResult.details.jvm`: hot methods (self, application-inclusive, stack tops with
+  interpreted/compiled/inlined frame types), allocation by class and site, GC pauses joined with
+  heap before/after, contended monitors and parked locks with stack tops, and compilations of the
+  scenario's own code. The raw `.jfr` (≈ 150 KB for the built-in scenarios, hard-capped at 64 MB)
+  is deleted with the work directory; nothing larger than the summary crosses the protocol.
+* **Why programmatic and not `-XX:StartFlightRecording`:** the recording covers exactly the
+  measured trials (not JVM start-up or warm-up trials), each scenario chooses its thresholds (lock
+  waits ≥ 0.1 ms for the contention scenario, 1 ms elsewhere), only the events the summary needs are
+  enabled (not the `profile` configuration), and the launcher needs no JFR-specific flag.
+* **Two clocks:** JFR timestamps and `System.nanoTime()` are different clocks. A custom event
+  (`JfrMarker`, `forge.Marker`) carries `nanoTime` at known points, so JFR events can be placed on
+  the scenario's own timeline (a compilation finishing → "C2 code available from invocation 379")
+  and the tables can be restricted to the window between the first and last marker.
+* **Allocation weights:** the first `jdk.ObjectAllocationSample` of each thread in a recording is
+  discarded. Its weight is "bytes since the thread's previous sample", and with no previous sample
+  in this recording it reached back to before the recording (observed: 41.8 MB credited to an
+  allocation-free loop). Exact totals come from HotSpot's per-thread allocation counter instead.
+* **JIT-mode variants:** a `VariantSpec` may declare JVM flags. The launcher reads them from the
+  compiled descriptor for the run's variant (never from the request) and accepts only
+  `-Xint`, `-XX:-TieredCompilation`, `-XX:TieredStopAtLevel=1`. A scenario refuses to run in a JVM
+  that lacks its variant's flags, so a unit test or IDE run cannot report numbers for the wrong mode.
+* **Cold code per trial:** the warm-up scenario defines a fresh copy of its kernel class in a new
+  class loader for every trial, so each trial starts with no compiled code and no profile for the
+  measured methods. Shared JDK code stays warm (stated as a caveat).
+* **Cost:** JFR adds its own (small) overhead to the measured trials, and parsing takes 50–500 ms
+  per run after the measurement (≈ 0.5 s under `-Xint`). Both are outside the timed regions.
+
 ## 4. Technology choices
 
 | Choice | Why | Trade-off |
@@ -215,7 +246,6 @@ explicit and reviewable.
 | Component | Phase | Notes |
 |---|---|---|
 | k6 adapter | 2 (deferred) | Needs Docker access from the runner and a target reachable from a container; to be designed with the dedicated runner container (Phase 9). The open-model generator, embedded target and pinned-baseline regression gate are implemented. |
-| JVM Lab | 5 | JFR recording (`-XX:StartFlightRecording`) in the child JVM, parsed with `jdk.jfr.consumer`. |
 | Failure Lab | 6 | Fault-injecting proxy in front of embedded downstream services. |
 | AI Investigator | 7 | Provider-agnostic adapter; prompts built only from stored artifacts, with citations to run ids. |
 | Challenge Arena | 8 | Challenges = scenario + verification predicate over recorded results. |

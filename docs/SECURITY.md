@@ -40,6 +40,15 @@ network interface.
   stdout cap kills the run.
 * **No shell.** Commands are built as argument arrays for `ProcessBuilder`; no string is ever
   passed through `cmd.exe` or `/bin/sh`.
+* **Per-variant JVM flags are allow-listed.** JVM Lab JIT-mode variants add one flag to the runner
+  command line. The flag comes from the compiled scenario descriptor for the validated variant id —
+  never from request data — and the launcher rejects anything outside `-Xint`,
+  `-XX:-TieredCompilation`, `-XX:TieredStopAtLevel=1` (execution-mode switches; no agents,
+  diagnostic options or file paths). A test checks every flag declared in the catalog.
+* **JFR recordings stay in the run directory.** JVM Lab scenarios record Java Flight Recorder into
+  the private work directory (size-capped at 64 MB by `Recording.setMaxSize`), summarise it in the
+  runner and return only the summary; the file is deleted with the directory. Stack frames in the
+  summary name only JDK and FORGE classes — there is no user code to leak.
 
 ### Container deployment (`docker-compose.yml`)
 * Server image runs as a non-root user.

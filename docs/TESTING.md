@@ -63,6 +63,32 @@ Deterministic tests with exact expected counts derived by hand:
   address, worker counts) — never latency or throughput values, which depend on the machine.
 * Parameter bounds keep the load small; a run whose trials cannot finish before the deadline is refused.
 
+### JFR summary (`forge-lab/.../jvm/JfrSummariserTest`)
+Records a real JFR file in the test JVM around workloads whose JFR footprint is certain, then
+asserts structure only: an explicit `System.gc()` appears with cause `System.gc()` and heap
+before/after; a monitor held across a 150 ms sleep while another thread waits for it is recorded
+as a `JavaMonitorEnter` on that class, attributed to the waiting test code; the same with a
+`ReentrantLock` appears as `ThreadPark`; allocation samples attribute `byte[]` to the allocating
+method and the allocating thread's first sample is discarded; a spinning method appears among the
+CPU samples; markers come back in order with their `nanoTime`; tables are restricted to the window
+between the markers; summarising one file twice gives equal summaries. Pure helpers: marker-based
+clock conversion (interpolation and extrapolation) and JVM array descriptors (`[B` → `byte[]`).
+
+### JVM Lab scenarios (`forge-lab/.../scenarios/JvmScenariosTest`, `.../scenarios/jvm/JvmScenarioLogicTest`)
+* Warm-up: every invocation of every trial is timed and positive; checksums equal the reference;
+  compilations of the kernel belong to that trial's fresh class loader and are placed on a valid
+  invocation index; the JIT-mode variants refuse to run in a JVM without their flag.
+* Warm-up metrics from synthetic series: invocation-axis mapping, steady state, warm-up cost, the
+  steady-state point (unaffected by a late slow stretch), a flat series needing no warm-up.
+* Allocation: all six implementations return the reference result (also on empty input and
+  small-value-cache edge cases); boxed stream allocates more than the primitive loop and
+  `String +=` more than 10× the presized builder (measured cold, before C2 could scalar-replace
+  anything — a property of the code, not of timing).
+* Lock contention: every variant keeps count and checksum; any JFR-recorded contention attributed to
+  scenario code is on the accumulator the variant uses (this caught measurement-induced contention:
+  workers reading their own `ThreadMXBean` counters at the same moment blocked each other inside
+  the JDK); the raw recording stays in the work directory.
+
 ### Regression gate (`forge-server/.../analysis/RegressionGateTest`)
 Comparisons built from fixed samples: a worse primary metric whose interval excludes 1.0 is a
 regression; better is an improvement; overlapping samples are "no difference detected"; different
@@ -82,6 +108,9 @@ Uses deliberately misbehaving "runners" (`MisbehavingRunners`):
 * **Environment probe** sees only `Path/SystemRoot/TEMP/TMP` (Windows) or `PATH/TMPDIR/LANG`
   (Unix) and a private temp dir, which is deleted afterwards.
 * `@argfile` quoting of backslashes and quotes.
+* Per-variant JVM flags: a JIT-mode variant adds its declared flag before `-cp`, other variants add
+  none, flags outside the allow-list (`-XX:+UnlockDiagnosticVMOptions`, `-javaagent:…`) are refused,
+  and every flag declared anywhere in the catalog is on the allow-list.
 
 ### End-to-end (`forge-server/.../ExperimentFlowIntegrationTest`, Testcontainers PostgreSQL 17)
 HTTP API → Flyway schema → DB-backed queue → isolated runner JVM → stored results → comparison →
@@ -133,6 +162,14 @@ comparable" even when its raw comparison is directional.
 * The percentile spectrum joins series by percentile and drops unresolvable points; per-window
   counts become rates; virtual threads are labelled as having no pool.
 
+### Frontend: JVM Lab renderer (`forge-ui/src/test/jvm.test.tsx`)
+Frame shortening (packages dropped, arrays kept), tier names, rolling median, start/end marker
+pairing; the view lists each kernel compilation with the invocation its code was available from
+(or "after the last invocation"), self and inclusive hot-method tables with frame types, allocation
+by class and site next to the exact counter and the discarded first samples, the GC pause
+timeline and table, lock tables separating scenario waits from JDK/JFR-internal ones with the
+threshold, and the interpreter-only case (no compiler, no compilations, no GC).
+
 ### Recorded end-to-end check (Performance Lab, 2026-10-19)
 Through the HTTP API on a development server with its own database: baseline `blocking-pool` and
 candidate `async` at default parameters (5 trials + 1 warm-up), then `virtual-threads` and another
@@ -140,7 +177,19 @@ candidate `async` at default parameters (5 trials + 1 warm-up), then `virtual-th
 in the primary metric (client p99) with a bootstrap interval excluding 1.0, and the run detail
 rendered its tables and charts from the stored result (checked in a browser through the DOM).
 
+### Recorded end-to-end check (JVM Lab, 2026-10-19)
+Through the HTTP API on a development server with its own database (`forge_phase2_e2e`, port 8091,
+lab database disabled so the restricted role of the server on 8090 was not rotated) and the shaded
+runner jar: all four warm-up modes, all six allocation implementations and all three contention
+variants at default parameters. All 13 runs succeeded with their invariants held; the JIT-mode runs
+recorded `-XX:TieredStopAtLevel=1`, `-XX:-TieredCompilation` and `-Xint` in their launch flags;
+each JFR recording was about 150 KB; and the run detail rendered the warm-up timeline, compilation
+table, hot methods, allocation, GC and lock tables from the stored results (checked in a browser
+through the DOM; a screenshot of the warm-up chart was taken on an earlier run of the same build stage). Numbers are in ROADMAP.md, Phase 5.
+
 ## Known gaps
+* The JVM Lab has not been run in the Docker image (Temurin 21 JRE); JFR is part of that runtime,
+  but the run has not been recorded there.
 * No browser end-to-end tests (Playwright) yet — planned for phase 9.
 * Accessibility is designed in (semantic tables, labelled controls, focus rings, text alternatives
   for chart data) but has not been audited with assistive technology.
