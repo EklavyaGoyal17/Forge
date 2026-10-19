@@ -103,7 +103,9 @@ describe('HttpLoadView', () => {
     const client = screen.getByRole('table', { name: /intended send time/i })
     const rows = within(client).getAllByRole('row')
     expect(rows).toHaveLength(4) // header + 2 trials + merged
-    expect(within(rows[1]).getByText('2,001.9')).toBeInTheDocument()
+    // p99 at/above the 2000 ms request timeout is a lower bound and is marked as such
+    expect(within(rows[1]).getByText('≥ 2,001.9')).toHaveAttribute('title', expect.stringMatching(/lower bound/))
+    expect(within(rows[1]).getByText('1,525.8')).not.toHaveAttribute('title')
     expect(within(rows[1]).getByText('100 (11.11%)')).toBeInTheDocument()
     expect(within(rows[3]).getByRole('rowheader', { name: 'All trials (merged histograms)' })).toBeInTheDocument()
     expect(within(rows[3]).getByText('100 of 1,800')).toBeInTheDocument()

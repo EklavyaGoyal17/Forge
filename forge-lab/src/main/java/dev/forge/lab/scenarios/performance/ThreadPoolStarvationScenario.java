@@ -306,7 +306,7 @@ public final class ThreadPoolStarvationScenario implements Scenario {
                 "highestTrackableMs", Histograms.HIGHEST_MICROS / 1_000));
         result.detail("httpLoad", details);
 
-        observe(result, rate, workers, totalOffered, totalErrors, totalTimeouts, aggClient, aggUncorrected, aggService, aggQueue);
+        observe(result, rate, workers, timeoutNanos / 1e6, totalOffered, totalErrors, totalTimeouts, aggClient, aggUncorrected, aggService, aggQueue);
         return result.build();
     }
 
@@ -345,7 +345,7 @@ public final class ThreadPoolStarvationScenario implements Scenario {
         }
     }
 
-    private static void observe(ScenarioResult.Builder result, double rate, int workers, long offered, long errors, long timeouts,
+    private static void observe(ScenarioResult.Builder result, double rate, int workers, double timeoutMs, long offered, long errors, long timeouts,
                                 Histogram client, Histogram uncorrected, Histogram service, Histogram queue) {
         List<Trial> trials = result.trials();
         if (trials.isEmpty()) {
@@ -371,6 +371,12 @@ public final class ThreadPoolStarvationScenario implements Scenario {
         if (p99.length > 0) {
             result.observation(String.format("Client latency from the intended send time: median of per-trial p50 %.2f ms, p99 %.2f ms (p99 range %.2f–%.2f ms).",
                     median(p50), median(p99), p99[0], p99[p99.length - 1]));
+            long capped = Arrays.stream(p99).filter(v -> v >= timeoutMs).count();
+            if (capped > 0) {
+                result.observation(String.format(
+                        "In %d of %d trials p99 reached the %.0f ms request timeout: at least 1%% of requests timed out, and timeouts are recorded when the client gave up, so p99 and higher percentiles there are lower bounds — the real wait was longer.",
+                        capped, p99.length, timeoutMs));
+            }
         }
         if (client.getTotalCount() > 0 && uncorrected.getTotalCount() > 0) {
             double corrected99 = Histograms.ms(client.getValueAtPercentile(99));

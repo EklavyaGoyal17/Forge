@@ -60,6 +60,16 @@ function p999(s: LatencySummary): number | undefined {
   return s.count >= 1000 ? s.p999Ms : undefined
 }
 
+/** Values at or above the request timeout are lower bounds: those requests were recorded when the client gave up. */
+function Latency({ value, timeoutMs, strong }: { value: number | undefined; timeoutMs: number; strong?: boolean }) {
+  const bound = value !== undefined && value >= timeoutMs
+  return (
+    <td className={cx('num px-2.5 py-1.5', strong && 'font-medium', bound && 'text-warn')} title={bound ? 'At the request timeout: a lower bound of the real latency' : undefined}>
+      {bound ? '≥ ' : ''}{fmt(value)}
+    </td>
+  )
+}
+
 function errorCount(t: HttpLoadTrial) {
   return t.httpErrors + t.failures + t.timeouts + t.unfinished
 }
@@ -82,7 +92,7 @@ export function HttpLoadView({ details }: { details: HttpLoadDetails }) {
           timeout {fmt(c.requestTimeoutMs)} ms
         </p>
         <p className="text-[12px] text-muted">
-          Target service bound to {details.bindAddress} on an ephemeral port inside the runner JVM. Latencies are HdrHistogram values
+          Values marked ≥ reached the request timeout and are lower bounds. Target service bound to {details.bindAddress} on an ephemeral port inside the runner JVM. Latencies are HdrHistogram values
           ({details.histogram.significantDigits} significant digits).
         </p>
       </div>
@@ -104,12 +114,12 @@ export function HttpLoadView({ details }: { details: HttpLoadDetails }) {
               <tr key={t.trial} className="border-t border-border">
                 <th scope="row" className="num px-2.5 py-1.5 text-left font-normal text-muted">{t.trial + 1}</th>
                 <td className="num px-2.5 py-1.5 text-muted">{fmt(t.offered)}</td>
-                <td className="num px-2.5 py-1.5">{fmt(t.client.p50Ms)}</td>
-                <td className="num px-2.5 py-1.5">{fmt(t.client.p90Ms)}</td>
-                <td className="num px-2.5 py-1.5">{fmt(t.client.p95Ms)}</td>
-                <td className="num px-2.5 py-1.5 font-medium">{fmt(t.client.p99Ms)}</td>
+                <Latency value={t.client.p50Ms} timeoutMs={c.requestTimeoutMs} />
+                <Latency value={t.client.p90Ms} timeoutMs={c.requestTimeoutMs} />
+                <Latency value={t.client.p95Ms} timeoutMs={c.requestTimeoutMs} />
+                <Latency value={t.client.p99Ms} timeoutMs={c.requestTimeoutMs} strong />
                 <td className="num px-2.5 py-1.5" title={p999(t.client) === undefined ? `not resolvable from ${t.client.count} values` : undefined}>{fmt(p999(t.client))}</td>
-                <td className="num px-2.5 py-1.5">{fmt(t.client.maxMs)}</td>
+                <Latency value={t.client.maxMs} timeoutMs={c.requestTimeoutMs} />
                 <td className="num px-2.5 py-1.5">{fmt(t.achievedRps)}</td>
                 <td className={cx('num px-2.5 py-1.5', errorCount(t) > 0 && 'text-bad')}>
                   {errorCount(t) === 0 ? '0' : `${fmt(errorCount(t))} (${((100 * errorCount(t)) / Math.max(1, t.offered)).toFixed(2)}%)`}
@@ -119,12 +129,12 @@ export function HttpLoadView({ details }: { details: HttpLoadDetails }) {
             <tr className="border-t-2 border-border-strong bg-panel-2/40">
               <th scope="row" className="px-2.5 py-1.5 text-left font-normal text-dim">All trials (merged histograms)</th>
               <td className="num px-2.5 py-1.5 text-muted">{fmt(details.aggregate.client.count)}</td>
-              <td className="num px-2.5 py-1.5">{fmt(details.aggregate.client.p50Ms)}</td>
-              <td className="num px-2.5 py-1.5">{fmt(details.aggregate.client.p90Ms)}</td>
-              <td className="num px-2.5 py-1.5">{fmt(details.aggregate.client.p95Ms)}</td>
-              <td className="num px-2.5 py-1.5 font-medium">{fmt(details.aggregate.client.p99Ms)}</td>
+              <Latency value={details.aggregate.client.p50Ms} timeoutMs={c.requestTimeoutMs} />
+              <Latency value={details.aggregate.client.p90Ms} timeoutMs={c.requestTimeoutMs} />
+              <Latency value={details.aggregate.client.p95Ms} timeoutMs={c.requestTimeoutMs} />
+              <Latency value={details.aggregate.client.p99Ms} timeoutMs={c.requestTimeoutMs} strong />
               <td className="num px-2.5 py-1.5">{fmt(p999(details.aggregate.client))}</td>
-              <td className="num px-2.5 py-1.5">{fmt(details.aggregate.client.maxMs)}</td>
+              <Latency value={details.aggregate.client.maxMs} timeoutMs={c.requestTimeoutMs} />
               <td className="num px-2.5 py-1.5 text-muted">—</td>
               <td className={cx('num px-2.5 py-1.5', totalErrors > 0 && 'text-bad')}>
                 {totalErrors === 0 ? '0' : `${fmt(totalErrors)} of ${fmt(totalOffered)}`}
