@@ -25,6 +25,8 @@ export interface VariantSpec {
   sourceRef: string
   /** Modes this variant supports; empty = all. */
   modes: string[]
+  /** Extra runner JVM flags for this variant (JVM Lab JIT modes); empty for almost every scenario. */
+  jvmFlags: string[]
 }
 
 export interface MetricSpec {
@@ -265,11 +267,57 @@ export interface DatabaseDetails {
   sweep?: { page: number; medianMs: number; rowsScanned: number; explainExecutionMs: number }[]
 }
 
+// ---- JVM Lab: summaries of a JFR recording made inside the runner JVM ----
+
+export interface JfrFrameRow { frame: string; samples: number; share: number; frameTypes: Record<string, number> | null }
+export interface JfrPathRow { frames: string[]; samples: number; share: number }
+export interface JfrAllocationClassRow { objectClass: string; weightBytes: number; share: number; samples: number }
+export interface JfrAllocationSiteRow { objectClass: string; topFrame: string; appFrame: string | null; weightBytes: number; share: number; samples: number }
+export interface JfrGcPause { gcId: number; name: string; cause: string; atMs: number; sumOfPausesMs: number; longestPauseMs: number; heapBeforeBytes: number | null; heapAfterBytes: number | null }
+export interface JfrContentionRow { lockClass: string; appFrame: string | null; events: number; totalMs: number; maxMs: number; stackTop: string[] }
+export interface JfrContention { thresholdMs: number; events: number; totalMs: number; rows: JfrContentionRow[] }
+export interface JfrCompilation { method: string; classLoader: string; level: number; osr: boolean; atMs: number; durationMs: number; endAtMs: number; codeSize: number; succeeded: boolean }
+export interface JfrDeoptimization { method: string; classLoader: string; reason: string; action: string; atMs: number; lineNumber: number }
+export interface JfrMarker { label: string; atMs: number; nanoTime: number }
+
+export interface JfrSummary {
+  recording: {
+    durationMs: number
+    fileBytes: number
+    eventCounts: Record<string, number>
+    settings: Record<string, string>
+    windowStartMs: number | null
+    windowEndMs: number | null
+    truncatedTables: string[]
+  }
+  cpu: { samples: number; periodMs: number; topSelf: JfrFrameRow[]; topTotal: JfrFrameRow[]; hotPaths: JfrPathRow[] }
+  allocation: { samples: number; sampledBytes: number; discardedFirstSamples: number; byClass: JfrAllocationClassRow[]; sites: JfrAllocationSiteRow[] }
+  gc: { youngCollector: string | null; oldCollector: string | null; collections: number; totalPauseMs: number; maxPauseMs: number; pauses: JfrGcPause[] }
+  locks: { monitorEnter: JfrContention; threadPark: JfrContention }
+  compilations: JfrCompilation[]
+  deoptimizations: JfrDeoptimization[]
+  markers: JfrMarker[]
+}
+
+/** A compilation of the warm-up kernel, placed on the invocation axis (-1: after the last invocation). */
+export interface WarmupCompilation { method: string; level: number; osr: boolean; succeeded: boolean; atInvocation: number; compileMs: number; codeSize: number }
+
+export interface WarmupTrialSeries { trial: number; invocationNanos: number[]; compilations: WarmupCompilation[]; deoptimizations: JfrDeoptimization[] }
+
+export interface JvmDetails {
+  kind: 'warmup' | 'allocation' | 'contention'
+  jitMode: { variantFlags: string[]; compiler: string | null; jvmArguments: string[] }
+  warmup?: { invocations: number; workSize: number; trials: WarmupTrialSeries[] }
+  allocation?: { mode: string; size: number; opsPerTrial: number; exactAllocatedBytes: number; reference: Record<string, unknown> }
+  contention?: { threads: number; incrementsPerThread: number; workRounds: number; availableProcessors: number; contentionMonitoring: boolean }
+  jfr: JfrSummary
+}
+
 export interface ScenarioResult {
   trials: Trial[]
   invariant: { description: string | null; checked: number; violations: number; held: boolean | null }
   observations: string[]
-  details: { explorer?: ExplorerDetails; jmh?: JmhDetails; httpLoad?: HttpLoadDetails; database?: DatabaseDetails; [k: string]: unknown }
+  details: { explorer?: ExplorerDetails; jmh?: JmhDetails; httpLoad?: HttpLoadDetails; database?: DatabaseDetails; jvm?: JvmDetails; [k: string]: unknown }
 }
 
 export interface Run {

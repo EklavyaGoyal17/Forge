@@ -93,7 +93,7 @@ export function RunConfigForm({ descriptor: d, sources, lastRun, onSubmit, submi
             return (
             <label
               key={v.id}
-              title={usable ? undefined : `Not available in ${values.mode} mode: library internals are not instrumented for the explorer`}
+              title={usable ? undefined : `Not available in ${values.mode} mode${values.mode === 'explore' ? ': library internals are not instrumented for the explorer' : ''}`}
               className={cx(
                 'flex flex-col gap-1 rounded-md border p-2.5 transition-colors',
                 usable ? 'cursor-pointer' : 'cursor-not-allowed opacity-45',
@@ -106,6 +106,7 @@ export function RunConfigForm({ descriptor: d, sources, lastRun, onSubmit, submi
                 {v.expectedCorrect === false && <Badge tone="bad">broken reference</Badge>}
                 {v.expectedCorrect === true && <Badge tone="ok">expected correct</Badge>}
                 {v.modes?.length > 0 && <Badge>{v.modes.join(' / ')} only</Badge>}
+                {v.jvmFlags?.length > 0 && <Badge tone="info" title="The runner JVM is started with this flag for this variant">{v.jvmFlags.join(' ')}</Badge>}
               </span>
               <span className="pl-5 text-[12px] leading-snug text-muted">{v.description}</span>
             </label>

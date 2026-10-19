@@ -23,7 +23,7 @@ const SHOWCASES = [
     title: 'The Performance Mystery',
     text: 'A service whose throughput plateaus under load: open-model load tests, JFR profiles, a fix, and a comparable re-run.',
     available: false,
-    needs: 'Performance lab (phase 2) and JVM lab (phase 5)',
+    needs: 'JFR profiling inside the HTTP load scenario (the Performance and JVM labs exist, but are not combined yet)',
   },
 ]
 

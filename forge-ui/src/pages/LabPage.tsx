@@ -33,6 +33,14 @@ const LAB_INTRO: Partial<Record<Lab, { heading: string; points: string[] }>> = {
       'The service runs on 127.0.0.1 inside the same runner JVM as the load generator: they share the CPU and the garbage collector, and nothing leaves the machine.',
     ],
   },
+  JVM: {
+    heading: 'The profiler runs inside the experiment',
+    points: [
+      'Each run records Java Flight Recorder in its own runner JVM, started by the scenario around the measured trials. The recording is summarised there — hot methods, allocation sites, GC pauses, contended locks, JIT compilations — and only the summary is stored; the raw .jfr file is deleted with the run directory.',
+      'JFR samples: CPU stacks every 10 ms, allocations at most 300 per second, lock waits above a threshold. Tables show where time and bytes went, not exact totals; exact counters (per-thread allocated bytes, BLOCKED/WAITING counts) are recorded next to them.',
+      'JIT modes (C1 only, C2 only, interpreter only) are real JVM flags on the runner process, taken from an allow-list. Warm-up is measured per method: every trial loads a fresh copy of the kernel class.',
+    ],
+  },
   ALGORITHMS: {
     heading: 'Complexity is a growth rate, not a time',
     points: [

@@ -3,14 +3,6 @@ import { Card } from '../components/ui'
 import type { ModuleInfo } from '../lib/labs'
 
 const PLANS: Record<string, { what: string[]; safety: string }> = {
-  '/labs/jvm': {
-    what: [
-      'Start the runner JVM with a Java Flight Recorder recording and parse it with jdk.jfr.consumer.',
-      'Allocation pressure, GC pauses, lock contention, CPU samples and blocked threads for a run.',
-      'Warm-up / JIT demonstrations and allocation-heavy vs allocation-light variants.',
-    ],
-    safety: 'Recordings are written only inside the run’s private work directory and size-capped.',
-  },
   '/labs/database': {
     what: [
       'A disposable lab database with a restricted role that cannot see FORGE’s own tables.',

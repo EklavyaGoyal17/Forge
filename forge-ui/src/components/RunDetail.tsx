@@ -8,6 +8,7 @@ import { TrialChart } from './charts'
 import { DatabaseView } from './DatabaseView'
 import { ExplorerView } from './ExplorerView'
 import { HttpLoadView } from './HttpLoadView'
+import { JvmView } from './JvmView'
 import { Badge, Button, InvariantBadge, Stat, StatusPill, Tabs, cx } from './ui'
 
 type Tab = 'results' | 'timeline' | 'artifacts' | 'environment' | 'config'
@@ -124,6 +125,7 @@ function Results({ view, descriptor }: { view: RunView; descriptor: ScenarioDesc
   const jmh = result.details.jmh
   const httpLoad = result.details.httpLoad
   const database = result.details.database
+  const jvm = result.details.jvm
 
   return (
     <div className="flex flex-col gap-5">
@@ -148,6 +150,8 @@ function Results({ view, descriptor }: { view: RunView; descriptor: ScenarioDesc
       {httpLoad && <HttpLoadView details={httpLoad} />}
 
       {database && <DatabaseView details={database} />}
+
+      {jvm && <JvmView details={jvm} />}
 
       {!explorer && chosen && (
         <div className="flex flex-col gap-2">

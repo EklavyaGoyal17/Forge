@@ -22,9 +22,9 @@ const descriptor: ScenarioDescriptor = {
     { name: 'exploreThreads', label: 'Explored threads', type: 'INTEGER', defaultValue: 2, min: 2, max: 3, options: [], unit: 'threads', description: '', appliesToModes: ['explore'] },
   ],
   variants: [
-    { id: 'unsynchronized', label: 'Plain field', description: 'racy', expectedCorrect: false, sourceRef: 'x#unsynchronized', modes: [] },
-    { id: 'atomic-cas', label: 'AtomicLong CAS loop', description: 'correct', expectedCorrect: true, sourceRef: 'x#atomic-cas', modes: [] },
-    { id: 'library-queue', label: 'Library queue', description: 'not instrumented', expectedCorrect: true, sourceRef: 'x#q', modes: ['stress'] },
+    { id: 'unsynchronized', label: 'Plain field', description: 'racy', expectedCorrect: false, sourceRef: 'x#unsynchronized', modes: [], jvmFlags: [] },
+    { id: 'atomic-cas', label: 'AtomicLong CAS loop', description: 'correct', expectedCorrect: true, sourceRef: 'x#atomic-cas', modes: [], jvmFlags: [] },
+    { id: 'library-queue', label: 'Library queue', description: 'not instrumented', expectedCorrect: true, sourceRef: 'x#q', modes: ['stress'], jvmFlags: [] },
   ],
   metrics: [{ name: 'throughputMopsPerSec', label: 'Throughput', unit: 'M/s', direction: 'HIGHER_IS_BETTER', description: '' }],
   primaryMetric: 'throughputMopsPerSec',
