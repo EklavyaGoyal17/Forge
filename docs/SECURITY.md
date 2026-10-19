@@ -9,7 +9,7 @@ contained. Read the "Residual risks" section before exposing FORGE to anyone but
 | Asset | Threat | Primary control |
 |---|---|---|
 | Developer machine stability | Runaway CPU/memory/threads from an experiment | Child JVM with `-Xmx`, `-Xss`, `-XX:ActiveProcessorCount`, `-XX:+ExitOnOutOfMemoryError`, wall-clock timeout, process-tree kill |
-| FORGE's own data | Experiment code writing to platform tables | Child JVM receives no database credentials; empty environment |
+| FORGE's own data | Experiment code writing to platform tables | Child JVM never receives platform credentials; empty environment. Database Studio runs receive credentials (over stdin) for a restricted lab role that cannot connect to the platform database |
 | Host secrets | Env vars (`AWS_*`, tokens), home-directory files | Environment cleared before launch; working directory and `java.io.tmpdir` set to a private per-run directory |
 | Other hosts on the network | Load tests or fault injection aimed at real services | No user-supplied targets; the Performance Lab's HTTP target is an embedded service the scenario starts inside the child JVM, bound to 127.0.0.1 on an ephemeral port (verified at start-up), and its load is bounded (≤ 2 000 req/s, ≤ 256 connections, ≤ 10 s sustained per trial, ≤ 13 trials); any future external target requires an explicit allowlist entry |
 | Server availability | Many queued runs, oversized outputs | Bounded queue, serial execution, stdout/stderr byte caps, parameter bounds |
@@ -56,8 +56,9 @@ network interface.
    vetted scenarios; they would not stop deliberately malicious code. This is why code upload is
    not offered.
 2. **Shared network namespace.** In the compose deployment, child JVMs share the server
-   container's network and could reach PostgreSQL. They do not receive credentials, but defence in
-   depth would place the runner in its own container on a network with no route to the database.
+   container's network and could reach PostgreSQL. They never receive platform credentials (Database
+   Studio runs get the restricted lab role, which has no CONNECT on the platform database), but defence
+   in depth would place the runner in its own container on a network with no route to the database.
    (Planned: dedicated `forge-runner` container, `network_mode: none` for non-HTTP scenarios.)
 3. **Docker containers are not a perfect sandbox either.** They share the host kernel. Kernel
    vulnerabilities, misconfiguration, or a mounted Docker socket defeat them. For untrusted code
@@ -78,6 +79,9 @@ network interface.
   scenarios that intentionally demonstrate non-termination (e.g. visibility bugs) — those must run
   the offending thread as a daemon and report via the deadline.
 * No `System.exit` — the runner owns process exit codes.
-* Destructive operations against any database other than the disposable lab database are
-  forbidden; destructive operations against the lab database require explicit confirmation in the
-  UI (Phase 4).
+* Database scenarios use only the lab database, and only their own per-run schema
+  (`LabSession`), which is dropped at the end of the run. They never touch the platform database
+  or other schemas. (An earlier plan required UI confirmation for destructive lab-database
+  operations; it is unnecessary because nothing outside the run's own schema is ever modified.)
+* Lab-database timeouts (statement, lock, idle-in-transaction) are role settings, so a scenario
+  cannot run unbounded statements even if it forgets to check its deadline.

@@ -125,7 +125,27 @@ against it with the comparison above. The gate is conservative:
   OS timers (coarse on Windows). Absolute numbers over loopback are lower than over a network;
   the shape — where throughput plateaus and how latency grows past it — is the result.
 
-## 7. Generalisation caveats (shown next to results)
+## 7. Database experiments (Database Studio)
+
+* **Same data for compared runs.** The dataset is generated from the `dataSeed` parameter (default
+  1), not from the per-run seed, and the accounts queried in each trial come from it too — so two
+  variants are measured on identical rows with identical lookups (a paired design). A different
+  `dataSeed` is a different dataset and is flagged as a parameter difference.
+* **Client time is primary.** Latency is measured by the client around execute + fetch, including
+  the round trip. EXPLAIN (ANALYZE, BUFFERS) is captured alongside for the plan, buffers and the
+  server's own execution time — which includes per-node timing overhead, so it is never used as
+  the headline number.
+* **Warm caches.** The seeded data fits in memory; "buffers read" are usually the OS page cache,
+  not disk. Results do not describe tables larger than RAM.
+* **Fresh statistics.** Tables are VACUUM ANALYZEd after loading, so plans reflect current
+  statistics and a current visibility map — the best case for index-only scans.
+* **Plans are choices, not laws.** The captured plan is what PostgreSQL chose for this data size,
+  these settings (recorded with the run) and this version. Descriptions say what an index *makes
+  possible*; the plan shows what was actually done.
+* **Correctness first.** Pagination, N+1 and lost-update scenarios carry invariants (identical
+  pages, identical loaded graphs, no lost deposits) checked in every trial.
+
+## 8. Generalisation caveats (shown next to results)
 
 A result holds for: this machine, this JVM, this heap size, this data size and distribution, this
 concurrency level, and this code version. Before acting on it, ask:

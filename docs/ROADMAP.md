@@ -9,7 +9,7 @@ or a recorded manual check. Status values: `done`, `in progress`, `not started`.
 | 1 | Working experiment platform | done (CI workflow not yet executed on GitHub) |
 | 2 | Performance lab (HTTP) | done except the k6 adapter (deferred by design, see below) |
 | 3 | Concurrency lab | in progress (core exercises done) |
-| 4 | Database studio | not started |
+| 4 | Database studio | done |
 | 5 | JVM lab | not started |
 | 6 | Failure lab | not started |
 | 7 | AI investigator | not started |
@@ -53,10 +53,12 @@ fully verified; `[ ]` = not done.
 - [ ] Starvation and an explicit livelock exercise. *(livelock is already observable: the tryLock explorer reports schedules that exceed the step bound)*
 
 ## Phase 4 — Database studio
-- [ ] Disposable lab database and restricted role; seeded synthetic transaction history.
-- [ ] EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) capture and plan-tree visualisation.
-- [ ] Index on/off comparison; OFFSET vs keyset pagination; N+1 demonstration.
-- [ ] Isolation level and lock contention demonstrations.
+- [x] Disposable lab database and restricted role; seeded synthetic transaction history. *(`LabDatabaseServiceTest` against PostgreSQL 17: the role works in its own database but cannot connect to the platform database or create databases/roles, has its statement/lock timeouts, and a restart rotates its password and sweeps leftover run schemas. Each run seeds its own schema from `dataSeed` and drops it)*
+- [x] EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) capture and plan-tree visualisation. *(per-trial capture; UI plan tree with rows vs estimate, per-node self time and buffers — `database.test.tsx`)*
+- [x] Index on/off comparison; OFFSET vs keyset pagination; N+1 demonstration. *(`database.index-lookup`, `database.pagination` with a page-depth sweep and a page-equality invariant, `database.n-plus-one` with a graph-equality invariant and measured round-trip time)*
+- [x] Isolation level and lock contention demonstrations. *(`database.lost-update`: read-modify-write under READ COMMITTED vs SELECT … FOR UPDATE vs atomic UPDATE vs REPEATABLE READ / SERIALIZABLE with 40001 retries. Lock waits are included in the per-deposit time, not measured separately)*
+
+Recorded end-to-end check (2026-10-19, development machine, PostgreSQL 17.11 in Docker): all four scenarios succeeded through the API as the restricted lab role (`platformIsolated: true`). Index lookup median 17.8 ms without an index vs 0.95 ms with the covering index (identical probe checksums across all four variants with `dataSeed` 1); OFFSET page 2,000 read 100,000 rows for 50 (13.6 ms) vs keyset 50 rows (1.9 ms); N+1 issued 101 statements (105 ms, of which ≈ 80 % is the round-trip floor) vs 2 batched (3.6 ms); read-modify-write lost 568–585 of 800 deposits per trial while atomic UPDATE and SERIALIZABLE + retry lost none.
 
 ## Phase 5 — JVM lab
 - [ ] JFR capture in child JVM; allocation, GC, lock-contention and CPU sample views.

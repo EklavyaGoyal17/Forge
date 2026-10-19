@@ -101,6 +101,27 @@ bug: the first container build served `index.html` but 404'd every asset.)
 * Run configuration form: variants disabled outside their supported modes, mode-specific parameters, client-side bounds mirroring the server,
   variant source display, submission payload, explore mode forcing a single trial.
 
+### Lab database isolation (`forge-server/.../lab/LabDatabaseServiceTest`, Testcontainers PostgreSQL 17)
+The restricted role can create and drop schemas in its own database; it cannot connect to the
+platform database, cannot create databases or roles, and has its statement/lock timeouts. After a
+simulated restart the old password no longer works and leftover `run_*` schemas are swept, while
+other schemas are untouched. JDBC URL rewriting and run-id → schema-name mapping are covered.
+
+### Database Studio scenarios (`forge-lab/.../scenarios/DatabaseScenariosTest`, Testcontainers PostgreSQL 17)
+Only deterministic properties are asserted: the access path per index variant (Seq Scan without
+an index, the named index otherwise, Index Only Scan for the covering index); identical probe
+checksums across variants with different run seeds but the same `dataSeed`; OFFSET page 1,000 of
+20 reads at least the 19,980 skipped rows while keyset reads fewer than 100, and both return the
+same pages; N+1 / join / batched issue 31 / 1 / 2 statements and load identical graphs; the four
+correct SQL deposit patterns lose nothing; per-run schemas are gone afterwards; scenarios refuse to
+run without a lab database. Whether the racy read-modify-write loses deposits is timing-dependent
+and only its accounting is asserted.
+
+### Frontend: Database Studio (`forge-ui/src/test/database.test.tsx`)
+Plan flattening with per-node self time (multiplied by loops) and estimate error; ≥ 10×
+misestimates flagged; the view shows PostgreSQL settings, the exact SQL, a plan selector and the
+depth-sweep values; "no secondary index" is stated explicitly.
+
 ### Frontend: regression panel (`forge-ui/src/test/regression.test.tsx`)
 Nothing renders until a baseline is pinned; each checked run shows its gate, ratio, interval,
 reasons and non-gating secondary regressions; a run with different parameters shows "not

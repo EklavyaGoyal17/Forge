@@ -43,7 +43,7 @@
 
 | Module | Responsibility | Depends on |
 |---|---|---|
-| `forge-lab` | Scenario SPI, built-in scenarios, statistics, runner protocol, `RunnerMain` entry point, open-model HTTP load generator. Plain Java — **no Spring**, so it is fast to start in a child JVM and easy to unit test. | Jackson 3, JMH, HdrHistogram |
+| `forge-lab` | Scenario SPI, built-in scenarios, statistics, runner protocol, `RunnerMain` entry point, open-model HTTP load generator, Database Studio helpers (per-run schema, seeded data, EXPLAIN capture). Plain Java — **no Spring**, so it is fast to start in a child JVM and easy to unit test. | Jackson 3, JMH, HdrHistogram, PostgreSQL JDBC |
 | `forge-server` | REST API, persistence (PostgreSQL + Flyway), run orchestration, child-JVM launcher, comparison and report generation, Engineering Review Board rubric. | `forge-lab`, Spring Boot |
 | `forge-ui` (npm) | Developer workstation UI. Renders only data returned by the API. | — |
 
@@ -130,6 +130,28 @@
   (its wake-up lag is reported per trial). Both are stated as caveats on every result.
 * **Not yet:** a k6 adapter (`grafana/k6`); deferred by design: a `grafana/k6` container would need Docker access from the runner (the runner has an empty environment and no Docker socket — see SECURITY.md) and, on Docker Desktop, a target bound beyond 127.0.0.1 so the container can reach it. Both weaken the isolation model; revisit together with the dedicated runner container in Phase 9.
 
+### ADR-010 — Database Studio: a separate lab database, a restricted role, a schema per run (implemented)
+* **Decision:** Database Studio scenarios run against a separate database (`forge_lab`) on the same
+  PostgreSQL server, as a dedicated role (`forge_lab_runner`) that `LabDatabaseService` creates or
+  updates on first use: login only (no superuser, CREATEDB, CREATEROLE, REPLICATION, BYPASSRLS),
+  connection limit, role-level `statement_timeout` / `lock_timeout` /
+  `idle_in_transaction_session_timeout`, and a password regenerated on every server start.
+  `REVOKE CONNECT ON DATABASE <platform> FROM PUBLIC` keeps the role out of the platform database
+  (only when the platform user owns it; the status reports whether isolation is enforced).
+* **Credentials** reach the runner only for `Lab.DATABASE` scenarios and only inside the
+  `RunSpec` written to its stdin — never on a command line (visible in process lists) or in the
+  stored environment, which records the database and role names only.
+* **Per-run schema:** each run creates `run_<run id>`, seeds it deterministically from the
+  `dataSeed` parameter, measures, and drops it; the server drops it again after the run (in case
+  the runner was killed) and sweeps leftovers on startup.
+* **Why not the platform database or a container per run:** the platform tables must be
+  unreachable from experiment code; a container per run would need Docker access from the server
+  and add seconds per run. A separate database + restricted role gives the isolation that matters
+  here (no access to platform data, bounded statements) at no extra infrastructure.
+* **Why `dataSeed` is a parameter:** runs that are compared must see identical rows. Seeding from
+  the per-run seed (the first implementation) silently gave every run different data; making the
+  dataset part of the configuration turns a different dataset into a visible parameter difference.
+
 ## 4. Technology choices
 
 | Choice | Why | Trade-off |
@@ -157,6 +179,9 @@ experiment 1 ──── * run 1 ──── * run_event
   environment (`jsonb`), result (`jsonb`), exit code, timing.
 * `run_event` — ordered lifecycle and progress log, visible in the UI timeline.
 * `run_artifact` — raw outputs (runner stderr, JMH log, thread dumps, traces), size-capped.
+
+Database Studio data lives elsewhere: in per-run schemas of the separate `forge_lab` database
+(ADR-010), created and dropped by each run; nothing of it is persisted except the run's result.
 
 ## 6. Scenario SPI (implemented)
 
@@ -190,7 +215,6 @@ explicit and reviewable.
 | Component | Phase | Notes |
 |---|---|---|
 | k6 adapter | 2 (deferred) | Needs Docker access from the runner and a target reachable from a container; to be designed with the dedicated runner container (Phase 9). The open-model generator, embedded target and pinned-baseline regression gate are implemented. |
-| Database Studio | 4 | Disposable `forge_lab` database, separate role with no access to platform tables, seeded data generation, `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` capture. |
 | JVM Lab | 5 | JFR recording (`-XX:StartFlightRecording`) in the child JVM, parsed with `jdk.jfr.consumer`. |
 | Failure Lab | 6 | Fault-injecting proxy in front of embedded downstream services. |
 | AI Investigator | 7 | Provider-agnostic adapter; prompts built only from stored artifacts, with citations to run ids. |

@@ -25,9 +25,10 @@ there are no placeholder charts.
 | Markdown report export (PDF via browser print) | ✅ |
 | **Concurrency Lab** — lost update (6 variants), deadlock (3), visibility (3), backpressure under overload (5); stress mode + deterministic interleaving explorer | ✅ |
 | **Algorithm Lab** — membership lookup (4 variants) measured with JMH | ✅ |
+| **Database Studio** — disposable PostgreSQL lab database with a restricted role; seeded transaction history per run; index on/off, OFFSET vs keyset pagination, N+1, and SQL lost updates under isolation levels and row locks; EXPLAIN (ANALYZE, BUFFERS) plan trees | ✅ |
 | **Performance Lab** — thread-pool starvation: an embedded loopback HTTP service (small blocking pool, 8× pool, non-blocking downstream, virtual threads) under an open-model load; client latency from the intended send time (coordinated-omission corrected, HdrHistogram), server service time and queue wait, Little's-law capacity | ✅ |
 | Web UI: dashboard, experiment workspace, run evidence, compare, notebook, review, command palette, keyboard shortcuts, dark/light | ✅ |
-| Performance lab k6 adapter (deferred by design), Database Studio, JVM lab (JFR), Failure lab, AI investigator, Challenge arena | planned — see [ROADMAP](docs/ROADMAP.md) |
+| Performance lab k6 adapter (deferred by design), JVM lab (JFR), Failure lab, AI investigator, Challenge arena | planned — see [ROADMAP](docs/ROADMAP.md) |
 
 ## Quick start
 
@@ -61,6 +62,12 @@ Do not point two FORGE servers at the same database (for example the compose con
 development server): both claim queued runs, so a run may execute on the other server's runner.
 Give the second server its own database and port, e.g.
 `FORGE_DB_URL=jdbc:postgresql://127.0.0.1:5442/forge_dev FORGE_PORT=8091`.
+
+Database Studio runs use a separate `forge_lab` database and a `forge_lab_runner` role that the
+server creates on first use, so the platform user must be allowed to create roles and databases
+(the compose user is). Names: `FORGE_LAB_DB`, `FORGE_LAB_ROLE`; disable with
+`FORGE_LAB_DB_ENABLED=false`. Roles are cluster-wide: two servers on one PostgreSQL should use
+different role names, or each rotates the other's password.
 
 Ports were chosen to avoid 5173/8080/5433, which other local projects commonly use.
 
