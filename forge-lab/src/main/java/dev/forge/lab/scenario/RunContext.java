@@ -1,6 +1,7 @@
 package dev.forge.lab.scenario;
 
 import java.nio.file.Path;
+import java.util.Optional;
 
 /** Services the runner provides to an executing scenario. */
 public interface RunContext {
@@ -24,6 +25,11 @@ public interface RunContext {
 
     /** Private per-run directory; the only place a scenario may write files. */
     Path workDir();
+
+    /** The disposable lab database, for Database Studio scenarios; empty for every other scenario. */
+    default Optional<LabDatabase> labDatabase() {
+        return Optional.empty();
+    }
 
     /** Nanos from {@link System#nanoTime()} after which the scenario should stop producing new work. */
     long deadlineNanos();

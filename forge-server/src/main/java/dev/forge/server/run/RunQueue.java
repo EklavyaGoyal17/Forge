@@ -1,8 +1,12 @@
 package dev.forge.server.run;
 
+import dev.forge.lab.scenario.Lab;
 import dev.forge.lab.scenario.RunSpec;
+import dev.forge.lab.scenario.Scenario;
+import dev.forge.lab.scenario.ScenarioCatalog;
 import dev.forge.server.config.Json;
 import dev.forge.server.config.RunnerProperties;
+import dev.forge.server.lab.LabDatabaseService;
 import dev.forge.server.system.HostInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,18 +39,20 @@ public class RunQueue implements SmartLifecycle {
     private final RunnerProperties props;
     private final HostInfo host;
     private final Json json;
+    private final LabDatabaseService labDatabase;
     private final Semaphore signal = new Semaphore(0);
     private final List<Thread> workers = new ArrayList<>();
     private volatile boolean running;
 
     public RunQueue(RunRepository runs, RunService service, RunnerLauncher launcher, RunnerProperties props,
-                    HostInfo host, Json json) {
+                    HostInfo host, Json json, LabDatabaseService labDatabase) {
         this.runs = runs;
         this.service = service;
         this.launcher = launcher;
         this.props = props;
         this.host = host;
         this.json = json;
+        this.labDatabase = labDatabase;
         service.onEnqueue(() -> signal.release());
     }
 
@@ -111,6 +117,18 @@ public class RunQueue implements SmartLifecycle {
         Map<String, Object> params = json.convert(run.params(), Map.class);
         RunSpec spec = new RunSpec(run.id().toString(), run.scenarioId(), run.scenarioVersion(), run.variant(), params,
                 run.seed(), run.trials(), run.warmupTrials());
+        boolean needsLab = ScenarioCatalog.find(run.scenarioId()).map(Scenario::descriptor)
+                .map(d -> d.lab() == Lab.DATABASE).orElse(false);
+        if (needsLab) {
+            try {
+                spec = spec.withLabDatabase(labDatabase.ensure());
+            } catch (RuntimeException e) {
+                log.error("lab database unavailable for {}", run.id(), e);
+                runs.addEvent(run.id(), Instant.now(), "ERROR", "lab database unavailable: " + e.getMessage());
+                runs.finish(run.id(), RunStatus.FAILED, "lab database unavailable: " + e.getMessage(), null, null, null);
+                return;
+            }
+        }
         runs.addEvent(run.id(), Instant.now(), "INFO", "starting runner JVM: heap " + run.heapMb() + " MB, timeout "
                 + run.timeoutSeconds() + " s" + (props.activeProcessorCount() > 0
                 ? ", ActiveProcessorCount=" + props.activeProcessorCount() : ""));
@@ -165,7 +183,14 @@ public class RunQueue implements SmartLifecycle {
                 }
             }
         }
-        runs.finish(run.id(), status, reason, outcome.exitCode(), environment(run, c, outcome), c.result);
+        if (needsLab) {
+            try {
+                labDatabase.dropRunSchema(run.id());
+            } catch (RuntimeException e) {
+                runs.addEvent(run.id(), Instant.now(), "WARN", "could not drop the run's lab schema: " + e.getMessage());
+            }
+        }
+        runs.finish(run.id(), status, reason, outcome.exitCode(), environment(run, c, outcome, needsLab), c.result);
         runs.addEvent(run.id(), Instant.now(), status == RunStatus.SUCCEEDED ? "INFO" : "ERROR",
                 "finished: " + status + (reason == null ? "" : " — " + reason));
     }
@@ -208,12 +233,17 @@ public class RunQueue implements SmartLifecycle {
         }
     }
 
-    private JsonNode environment(RunRecord run, Collected c, RunnerLauncher.Outcome outcome) {
+    private JsonNode environment(RunRecord run, Collected c, RunnerLauncher.Outcome outcome, boolean needsLab) {
         Map<String, Object> launch = new LinkedHashMap<>();
         launch.put("heapMb", run.heapMb());
         launch.put("timeoutSeconds", run.timeoutSeconds());
         launch.put("activeProcessorCountCap", props.activeProcessorCount());
         launch.put("maxConcurrentRuns", props.maxConcurrentRuns());
+        if (needsLab) {
+            Map<String, Object> lab = new LinkedHashMap<>(labDatabase.status());
+            lab.keySet().retainAll(List.of("database", "role", "platformIsolated", "statementTimeoutSeconds", "lockTimeoutSeconds", "connectionLimit"));
+            launch.put("labDatabase", lab);
+        }
         launch.put("jvmFlags", outcome.commandLine().stream().filter(a -> a.startsWith("-X") || a.startsWith("-XX")).toList());
         ObjectNode env = json.mapper().createObjectNode();
         env.set("runner", c.environment);

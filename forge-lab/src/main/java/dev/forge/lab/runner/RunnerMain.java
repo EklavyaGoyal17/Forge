@@ -1,5 +1,6 @@
 package dev.forge.lab.runner;
 
+import dev.forge.lab.scenario.LabDatabase;
 import dev.forge.lab.scenario.ParameterValidator;
 import dev.forge.lab.scenario.RunContext;
 import dev.forge.lab.scenario.RunSpec;
@@ -79,7 +80,7 @@ public final class RunnerMain {
                 return EXIT_BAD_SPEC;
             }
             spec = new RunSpec(raw.runId(), raw.scenarioId(), raw.scenarioVersion(), raw.variant(), v.params(),
-                    raw.seed(), v.trials(), v.warmupTrials());
+                    raw.seed(), v.trials(), v.warmupTrials(), raw.labDatabase());
         } catch (IOException | RuntimeException e) {
             protocol.error("bad-spec", "could not read run spec: " + e.getMessage(), stackTrace(e));
             return EXIT_BAD_SPEC;
@@ -89,7 +90,7 @@ public final class RunnerMain {
         long timeoutMillis = Long.getLong("forge.timeoutMillis", 60_000L);
         // leave a margin so the scenario can report before the server's hard kill
         long deadline = System.nanoTime() + Math.max(1_000, timeoutMillis - 2_000) * 1_000_000L;
-        RunContext ctx = new ProtocolContext(protocol, workDir, deadline);
+        RunContext ctx = new ProtocolContext(protocol, workDir, deadline, spec.labDatabase());
 
         try {
             Files.createDirectories(workDir);
@@ -117,7 +118,12 @@ public final class RunnerMain {
         return s.length() > 16_000 ? s.substring(0, 16_000) + "\n…" : s;
     }
 
-    private record ProtocolContext(Protocol protocol, Path workDir, long deadlineNanos) implements RunContext {
+    private record ProtocolContext(Protocol protocol, Path workDir, long deadlineNanos, LabDatabase lab) implements RunContext {
+        @Override
+        public java.util.Optional<LabDatabase> labDatabase() {
+            return java.util.Optional.ofNullable(lab);
+        }
+
         @Override
         public void event(String level, String message) {
             protocol.event(level, message);

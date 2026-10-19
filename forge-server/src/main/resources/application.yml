@@ -43,5 +43,14 @@ forge:
     artifact-cap-bytes: 1048576
     max-artifacts-per-run: 20
     keep-work-dirs: false
+  # Database Studio: a separate database and restricted role on the same PostgreSQL server.
+  # The platform user must be allowed to create roles and databases (the compose user is).
+  lab-database:
+    enabled: ${FORGE_LAB_DB_ENABLED:true}
+    database: ${FORGE_LAB_DB:forge_lab}
+    role: ${FORGE_LAB_ROLE:forge_lab_runner}
+    connection-limit: 16
+    statement-timeout-seconds: 60
+    lock-timeout-seconds: 10
 
 # Structured (JSON) logs: set LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs (or logstash).
