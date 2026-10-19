@@ -52,10 +52,18 @@ public final class JfrSummariser {
      * @param pathDepth        frames kept per hot path and per lock stack
      * @param maxPauses        GC pauses listed individually (totals always cover all of them)
      * @param maxCompilations  compilations/deoptimizations listed
+     * @param betweenMarkers   when the file holds at least two {@link JfrMarker}s, count CPU,
+     *                         allocation, GC and lock events only between the first and the last one
+     *                         (the measured region), leaving out JFR start-up and the stop/dump code
      */
-    public record Options(String appPackagePrefix, int topRows, int pathDepth, int maxPauses, int maxCompilations) {
+    public record Options(String appPackagePrefix, int topRows, int pathDepth, int maxPauses, int maxCompilations,
+                          boolean betweenMarkers) {
         public static Options forPackage(String prefix) {
-            return new Options(prefix, 12, 6, 400, 400);
+            return new Options(prefix, 12, 6, 400, 400, true);
+        }
+
+        public Options withMaxPauses(int max) {
+            return new Options(appPackagePrefix, topRows, pathDepth, max, maxCompilations, betweenMarkers);
         }
     }
 
@@ -81,13 +89,25 @@ public final class JfrSummariser {
             }
         }
         Instant t0 = origin != null ? origin : first != null ? first : Instant.EPOCH;
-        Acc acc = new Acc(t0, opt);
+        Instant windowStart = null;
+        Instant windowEnd = null;
+        if (opt.betweenMarkers()) {
+            List<Instant> marks = events.stream().filter(e -> e.getEventType().getName().equals(JfrMarker.NAME))
+                    .map(RecordedEvent::getStartTime).sorted().toList();
+            if (marks.size() >= 2) {
+                windowStart = marks.getFirst();
+                windowEnd = marks.getLast();
+            }
+        }
+        Acc acc = new Acc(t0, opt, windowStart, windowEnd);
         for (RecordedEvent e : events) {
             acc.accept(e);
         }
         double durationMs = last == null ? 0 : Math.max(0, ms(Duration.between(t0, last)));
         RecordingInfo info = new RecordingInfo(durationMs, Files.size(file), acc.counts,
-                settings == null ? Map.of() : settings.describe(), acc.truncated);
+                settings == null ? Map.of() : settings.describe(),
+                windowStart == null ? null : ms(Duration.between(t0, windowStart)),
+                windowEnd == null ? null : ms(Duration.between(t0, windowEnd)), acc.truncated);
         Gc gc = acc.gc();
         Cpu cpu = acc.cpu(settings);
         Allocation alloc = acc.allocation();
@@ -142,6 +162,8 @@ public final class JfrSummariser {
 
         long allocSamples;
         long allocBytes;
+        long allocDiscarded;
+        final Set<Long> allocThreadsSeen = new java.util.HashSet<>();
         final Map<String, long[]> allocByClass = new HashMap<>();
         final Map<List<String>, long[]> allocBySite = new HashMap<>();
 
@@ -158,9 +180,19 @@ public final class JfrSummariser {
         final List<Deoptimization> deopts = new ArrayList<>();
         final List<Marker> markers = new ArrayList<>();
 
-        Acc(Instant t0, Options opt) {
+        final Instant windowStart;
+        final Instant windowEnd;
+
+        Acc(Instant t0, Options opt, Instant windowStart, Instant windowEnd) {
             this.t0 = t0;
             this.opt = opt;
+            this.windowStart = windowStart;
+            this.windowEnd = windowEnd;
+        }
+
+        boolean inWindow(RecordedEvent e) {
+            return windowStart == null
+                    || (!e.getStartTime().isBefore(windowStart) && !e.getStartTime().isAfter(windowEnd));
         }
 
         double at(RecordedEvent e) {
@@ -170,6 +202,14 @@ public final class JfrSummariser {
         void accept(RecordedEvent e) {
             String type = e.getEventType().getName();
             counts.merge(type, 1L, Long::sum);
+            boolean windowed = switch (type) {
+                case "jdk.ExecutionSample", "jdk.ObjectAllocationSample", "jdk.GarbageCollection",
+                     "jdk.JavaMonitorEnter", "jdk.ThreadPark" -> true;
+                default -> false;
+            };
+            if (windowed && !inWindow(e)) {
+                return;
+            }
             switch (type) {
                 case "jdk.ExecutionSample" -> cpuSample(e);
                 case "jdk.ObjectAllocationSample" -> allocation(e);
@@ -227,6 +267,12 @@ public final class JfrSummariser {
         }
 
         void allocation(RecordedEvent e) {
+            var thread = e.getThread();
+            long threadKey = thread == null ? -1 : thread.getId();
+            if (allocThreadsSeen.add(threadKey)) {
+                allocDiscarded++;                    // weight reaches back before the recording
+                return;
+            }
             long weight = e.getLong("weight");
             String cls = className(e.getClass("objectClass"));
             allocSamples++;
@@ -315,7 +361,7 @@ public final class JfrSummariser {
                     .map(en -> new AllocationSiteRow(en.getKey().get(0), en.getKey().get(1), en.getKey().get(2),
                             en.getValue()[0], share(en.getValue()[0], allocBytes), en.getValue()[1]))
                     .toList();
-            return new Allocation(allocSamples, allocBytes, byClass, sites);
+            return new Allocation(allocSamples, allocBytes, allocDiscarded, byClass, sites);
         }
 
         Gc gc() {

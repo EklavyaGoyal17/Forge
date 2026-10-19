@@ -9,6 +9,9 @@ import dev.forge.lab.scenarios.database.PaginationScenario;
 import dev.forge.lab.scenarios.database.SqlLostUpdateScenario;
 import dev.forge.lab.scenarios.concurrency.LostUpdateScenario;
 import dev.forge.lab.scenarios.concurrency.VisibilityScenario;
+import dev.forge.lab.scenarios.jvm.AllocationScenario;
+import dev.forge.lab.scenarios.jvm.LockContentionScenario;
+import dev.forge.lab.scenarios.jvm.WarmupScenario;
 import dev.forge.lab.scenarios.performance.ThreadPoolStarvationScenario;
 
 import java.util.LinkedHashMap;
@@ -35,6 +38,9 @@ public final class ScenarioCatalog {
         register(new PaginationScenario());
         register(new NPlusOneScenario());
         register(new SqlLostUpdateScenario());
+        register(new WarmupScenario());
+        register(new AllocationScenario());
+        register(new LockContentionScenario());
     }
 
     private ScenarioCatalog() {

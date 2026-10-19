@@ -123,6 +123,9 @@ class JfrSummariserTest {
                 .containsEntry("jdk.ExecutionSample#period", "10 ms")
                 .containsEntry("jdk.JavaMonitorEnter#threshold", "1 ms");
         assertThat(summary.recording().eventCounts()).containsKeys("jdk.GarbageCollection", JfrMarker.NAME);
+        // tables cover the region between the two markers
+        assertThat(summary.recording().windowStartMs()).isEqualTo(summary.markers().get(0).atMs());
+        assertThat(summary.recording().windowEndMs()).isEqualTo(summary.markers().get(1).atMs());
     }
 
     @Test
@@ -162,6 +165,8 @@ class JfrSummariserTest {
     void allocationSamplesAreAttributedToClassesAndSites() {
         var a = summary.allocation();
         assertThat(a.samples()).isPositive();
+        // the allocating thread's first sample is dropped: its weight reaches back before the recording
+        assertThat(a.discardedFirstSamples()).isPositive();
         assertThat(a.sampledBytes()).isPositive();
         assertThat(a.byClass()).isNotEmpty();
         assertThat(a.byClass().stream().mapToDouble(JfrSummary.AllocationClassRow::share).sum()).isLessThanOrEqualTo(1.0 + 1e-9);

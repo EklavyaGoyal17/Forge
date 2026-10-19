@@ -39,7 +39,9 @@ class CatalogTest {
     void defaultsAreValidForEveryVariant() {
         for (ScenarioDescriptor d : ScenarioCatalog.descriptors()) {
             for (VariantSpec v : d.variants()) {
-                var r = ParameterValidator.validate(d, v.id(), Map.of(), null, null);
+                // a mode-restricted variant is run with its first supported mode (the UI switches to it)
+                Map<String, Object> params = v.modes().isEmpty() ? Map.of() : Map.of("mode", v.modes().getFirst());
+                var r = ParameterValidator.validate(d, v.id(), params, null, null);
                 assertThat(r.errors()).as("%s/%s", d.id(), v.id()).isEmpty();
             }
         }

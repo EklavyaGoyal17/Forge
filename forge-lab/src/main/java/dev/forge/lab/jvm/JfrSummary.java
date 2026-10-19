@@ -27,10 +27,15 @@ public record JfrSummary(
     }
 
     /**
+     * @param eventCounts     every event in the file, by type
+     * @param windowStartMs   start of the analysed window (first marker), or null if the whole
+     *                        recording was analysed; CPU, allocation, GC and lock tables only count
+     *                        events that started inside the window
      * @param truncatedTables names of tables that hit their row cap (the totals above them are complete)
      */
     public record RecordingInfo(double durationMs, long fileBytes, Map<String, Long> eventCounts,
-                                Map<String, String> settings, List<String> truncatedTables) {
+                                Map<String, String> settings, Double windowStartMs, Double windowEndMs,
+                                List<String> truncatedTables) {
     }
 
     /**
@@ -59,9 +64,14 @@ public record JfrSummary(
     /**
      * {@code jdk.ObjectAllocationSample}: each sample's weight is the bytes the thread allocated since
      * its previous sample, so weights are an estimate of where allocation happened, not exact counts.
+     *
+     * @param discardedFirstSamples each thread's first sample in the recording is left out: having no
+     *                              previous sample in this recording, its weight covers everything the
+     *                              thread allocated before (observed: tens of MB credited to whatever
+     *                              code happened to allocate first)
      */
-    public record Allocation(long samples, long sampledBytes, List<AllocationClassRow> byClass,
-                             List<AllocationSiteRow> sites) {
+    public record Allocation(long samples, long sampledBytes, long discardedFirstSamples,
+                             List<AllocationClassRow> byClass, List<AllocationSiteRow> sites) {
     }
 
     public record AllocationClassRow(String objectClass, long weightBytes, double share, long samples) {
