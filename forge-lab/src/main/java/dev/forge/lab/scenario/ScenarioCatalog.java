@@ -4,6 +4,9 @@ import dev.forge.lab.scenarios.algorithms.LookupScenario;
 import dev.forge.lab.scenarios.concurrency.BackpressureScenario;
 import dev.forge.lab.scenarios.concurrency.DeadlockScenario;
 import dev.forge.lab.scenarios.database.IndexLookupScenario;
+import dev.forge.lab.scenarios.database.NPlusOneScenario;
+import dev.forge.lab.scenarios.database.PaginationScenario;
+import dev.forge.lab.scenarios.database.SqlLostUpdateScenario;
 import dev.forge.lab.scenarios.concurrency.LostUpdateScenario;
 import dev.forge.lab.scenarios.concurrency.VisibilityScenario;
 import dev.forge.lab.scenarios.performance.ThreadPoolStarvationScenario;
@@ -29,6 +32,9 @@ public final class ScenarioCatalog {
         register(new LookupScenario());
         register(new ThreadPoolStarvationScenario());
         register(new IndexLookupScenario());
+        register(new PaginationScenario());
+        register(new NPlusOneScenario());
+        register(new SqlLostUpdateScenario());
     }
 
     private ScenarioCatalog() {

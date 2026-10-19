@@ -35,7 +35,7 @@ public final class Explain {
      * @param sharedRead shared buffers read from the OS (page cache or disk — PostgreSQL cannot tell)
      */
     public record Result(Map<String, Object> plan, double executionMs, double planningMs, long sharedHit,
-                         long sharedRead, long rootRows, List<String> nodes, boolean truncated) {
+                         long sharedRead, long rootRows, long scannedRows, List<String> nodes, boolean truncated) {
 
         public Map<String, Object> toMap(String label) {
             Map<String, Object> m = new LinkedHashMap<>();
@@ -45,6 +45,7 @@ public final class Explain {
             m.put("sharedHitBlocks", sharedHit);
             m.put("sharedReadBlocks", sharedRead);
             m.put("rootRows", rootRows);
+            m.put("scannedRows", scannedRows);
             m.put("nodes", nodes);
             m.put("truncated", truncated);
             m.put("plan", plan);
@@ -87,6 +88,7 @@ public final class Explain {
                 root.path("Shared Hit Blocks").asLong(),
                 root.path("Shared Read Blocks").asLong(),
                 root.path("Actual Rows").asLong(),
+                scanned(root),
                 nodes, truncated[0]);
     }
 
@@ -109,6 +111,25 @@ public final class Explain {
             m.put("Plans", kids);
         }
         return m;
+    }
+
+    /**
+     * Rows produced by scan nodes (actual rows × loops), i.e. how many rows PostgreSQL had to pull
+     * out of tables and indexes. Rows removed by a scan's own filter are added, since they were read too.
+     */
+    static long scanned(JsonNode n) {
+        long total = 0;
+        if (n.path("Node Type").asString("").contains("Scan")) {
+            long loops = Math.max(1, n.path("Actual Loops").asLong(1));
+            total += (n.path("Actual Rows").asLong() + n.path("Rows Removed by Filter").asLong()) * loops;
+        }
+        JsonNode children = n.get("Plans");
+        if (children != null) {
+            for (JsonNode c : children) {
+                total += scanned(c);
+            }
+        }
+        return total;
     }
 
     static String describe(JsonNode n) {
