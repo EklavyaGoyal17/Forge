@@ -225,11 +225,51 @@ export interface HttpLoadDetails {
   histogram: { unit: string; significantDigits: number; highestTrackableMs: number }
 }
 
+/** One node of PostgreSQL's EXPLAIN (FORMAT JSON) output, keys exactly as PostgreSQL emits them. */
+export interface PlanNode {
+  'Node Type': string
+  'Relation Name'?: string
+  'Index Name'?: string
+  'Actual Total Time'?: number
+  'Actual Rows'?: number
+  'Actual Loops'?: number
+  'Plan Rows'?: number
+  'Shared Hit Blocks'?: number
+  'Shared Read Blocks'?: number
+  'Rows Removed by Filter'?: number
+  Plans?: PlanNode[]
+  [key: string]: unknown
+}
+
+export interface ExplainCapture {
+  label: string
+  executionMs: number
+  planningMs: number
+  sharedHitBlocks: number
+  sharedReadBlocks: number
+  rootRows: number
+  scannedRows: number
+  nodes: string[]
+  truncated: boolean
+  plan: PlanNode
+}
+
+export interface DatabaseDetails {
+  postgres?: Record<string, string>
+  dataset?: { accounts: number; txnRows: number; seedMs: number; accountTableMb: number; txnTableMb: number }
+  index?: { name: string; ddl: string; buildMs?: number; sizeMb?: number } | null
+  queries?: { label: string; sql: string }[]
+  statements?: { label: string; sql: string }[]
+  plans?: ExplainCapture[]
+  probe?: { accountId: number; rows: number; checksum: number; sql: string }
+  sweep?: { page: number; medianMs: number; rowsScanned: number; explainExecutionMs: number }[]
+}
+
 export interface ScenarioResult {
   trials: Trial[]
   invariant: { description: string | null; checked: number; violations: number; held: boolean | null }
   observations: string[]
-  details: { explorer?: ExplorerDetails; jmh?: JmhDetails; httpLoad?: HttpLoadDetails; [k: string]: unknown }
+  details: { explorer?: ExplorerDetails; jmh?: JmhDetails; httpLoad?: HttpLoadDetails; database?: DatabaseDetails; [k: string]: unknown }
 }
 
 export interface Run {

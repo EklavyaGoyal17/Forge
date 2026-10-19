@@ -80,6 +80,12 @@ const DEMOS: Record<string, { title: string; question: string; hypothesis: strin
     hypothesis: '',
     tags: ['demo', 'concurrency'],
   },
+  pagination: {
+    title: 'The Query That Wouldn’t Scale',
+    question: 'Why does a deep page of the transaction feed get slower with OFFSET, and does a keyset cursor keep it flat?',
+    hypothesis: '',
+    tags: ['demo', 'database'],
+  },
 }
 
 export function NewExperimentPage() {

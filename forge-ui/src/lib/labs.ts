@@ -17,7 +17,7 @@ export const MODULES: ModuleInfo[] = [
   { path: '/labs/performance', label: 'Performance Lab', shortcut: 'g p', lab: 'PERFORMANCE', implemented: true, blurb: 'Open-model HTTP load against an embedded loopback service: throughput plateaus, queueing and coordinated-omission-correct latency.' },
   { path: '/labs/jvm', label: 'JVM Lab', shortcut: 'g j', lab: 'JVM', implemented: false, phase: 5, blurb: 'JIT warm-up, allocation, GC and lock profiling with Java Flight Recorder.' },
   { path: '/labs/concurrency', label: 'Concurrency Lab', shortcut: 'g c', lab: 'CONCURRENCY', implemented: true, blurb: 'Races, deadlocks and visibility bugs — under stress and under a controlled scheduler.' },
-  { path: '/labs/database', label: 'Database Studio', shortcut: 'g b', lab: 'DATABASE', implemented: false, phase: 4, blurb: 'PostgreSQL plans, indexes, pagination strategies and lock contention on seeded data.' },
+  { path: '/labs/database', label: 'Database Studio', shortcut: 'g b', lab: 'DATABASE', implemented: true, blurb: 'PostgreSQL plans, indexes, pagination strategies and lock contention on seeded data.' },
   { path: '/labs/failure', label: 'Failure Lab', shortcut: 'g f', lab: 'FAILURE', implemented: false, phase: 6, blurb: 'Bounded fault injection — latency, errors, refusals — against local services only.' },
   { path: '/labs/algorithms', label: 'Algorithm Lab', shortcut: 'g a', lab: 'ALGORITHMS', implemented: true, blurb: 'How data-structure choices behave on real hardware, measured with JMH.' },
   { path: '/challenges', label: 'Challenge Arena', shortcut: 'g h', implemented: false, phase: 8, blurb: 'Measurable engineering problems verified by tests and recorded evidence.' },

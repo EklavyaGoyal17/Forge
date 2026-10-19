@@ -16,8 +16,8 @@ const SHOWCASES = [
   {
     title: 'The Query That Wouldn’t Scale',
     text: 'OFFSET vs keyset pagination over seeded transaction history, with EXPLAIN ANALYZE plans side by side.',
-    available: false,
-    needs: 'Database Studio (phase 4)',
+    available: true,
+    to: '/experiments/new?scenario=database.pagination&demo=pagination',
   },
   {
     title: 'The Performance Mystery',

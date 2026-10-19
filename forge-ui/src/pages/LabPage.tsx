@@ -17,6 +17,14 @@ const LAB_INTRO: Partial<Record<Lab, { heading: string; points: string[] }>> = {
       'Neither proves the absence of bugs: stress testing samples schedules; the explorer is exhaustive only at its granularity and assumes sequential consistency (no JMM reorderings).',
     ],
   },
+  DATABASE: {
+    heading: 'Every run gets its own throwaway data',
+    points: [
+      'Each run seeds a deterministic synthetic transaction history into its own schema of a separate lab database, measures, and drops the schema. The same seed gives the same rows on the same PostgreSQL version.',
+      "Runs connect as a restricted role that cannot reach FORGE's own database, cannot create databases or roles, and is bound by statement and lock timeouts.",
+      'Plans are captured with EXPLAIN (ANALYZE, BUFFERS): they show what PostgreSQL chose for this data and these settings — another data size or fresher statistics can change the choice.',
+    ],
+  },
   PERFORMANCE: {
     heading: 'Load arrives whether or not you are ready',
     points: [

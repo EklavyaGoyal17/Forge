@@ -5,6 +5,7 @@ import type { MetricSpec, RunView, ScenarioDescriptor, Summary } from '../lib/ap
 import { api } from '../lib/api'
 import { bytes, duration, fmt, pct, runDuration, toNumber } from '../lib/format'
 import { TrialChart } from './charts'
+import { DatabaseView } from './DatabaseView'
 import { ExplorerView } from './ExplorerView'
 import { HttpLoadView } from './HttpLoadView'
 import { Badge, Button, InvariantBadge, Stat, StatusPill, Tabs, cx } from './ui'
@@ -122,6 +123,7 @@ function Results({ view, descriptor }: { view: RunView; descriptor: ScenarioDesc
   const explorer = result.details.explorer
   const jmh = result.details.jmh
   const httpLoad = result.details.httpLoad
+  const database = result.details.database
 
   return (
     <div className="flex flex-col gap-5">
@@ -144,6 +146,8 @@ function Results({ view, descriptor }: { view: RunView; descriptor: ScenarioDesc
       {explorer && <ExplorerView details={explorer} />}
 
       {httpLoad && <HttpLoadView details={httpLoad} />}
+
+      {database && <DatabaseView details={database} />}
 
       {!explorer && chosen && (
         <div className="flex flex-col gap-2">
