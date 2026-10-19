@@ -187,6 +187,7 @@ public final class NPlusOneScenario implements Scenario {
             "How much of the N+1 cost is the database doing work, and how much is waiting for N round trips?",
             "Every strategy loads exactly the same accounts and transactions, in the same order, as the single join.",
             List.of(
+                    TransactionHistory.dataSeedParameter(),
                     ParameterSpec.integer("rows", "Transactions", 200_000, 10_000, 2_000_000, "rows", "Rows seeded into txn."),
                     ParameterSpec.integer("accounts", "Accounts loaded", 100, 10, 1_000, "accounts",
                             "Accounts per load (the N in N+1); about a quarter of all accounts are in the 'north' region."),
@@ -246,7 +247,7 @@ public final class NPlusOneScenario implements Scenario {
             Map<String, Object> details = new LinkedHashMap<>();
             details.put("postgres", session.serverFacts());
             int accountRows = Math.max(4 * accounts, rows / 40);
-            TransactionHistory.Dataset data = TransactionHistory.seed(c, spec.seed(), accountRows, rows);
+            TransactionHistory.Dataset data = TransactionHistory.seed(c, spec.longParam("dataSeed"), accountRows, rows);
             details.put("dataset", data.toMap());
             try (Statement st = c.createStatement()) {
                 st.execute(TXN_INDEX);

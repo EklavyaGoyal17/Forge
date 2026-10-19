@@ -64,6 +64,7 @@ public final class PaginationScenario implements Scenario {
             "Why does page 2,000 take so much longer than page 1 with OFFSET, and what does a keyset cursor change?",
             "A keyset page contains exactly the same rows, in the same order, as the OFFSET page at the same position.",
             List.of(
+                    TransactionHistory.dataSeedParameter(),
                     ParameterSpec.integer("rows", "Transactions", 300_000, 10_000, 2_000_000, "rows",
                             "Rows seeded into txn (deterministic from the run seed)."),
                     ParameterSpec.integer("pageSize", "Page size", 50, 10, 500, "rows", "Rows per page."),
@@ -136,7 +137,7 @@ public final class PaginationScenario implements Scenario {
             Map<String, Object> details = new LinkedHashMap<>();
             details.put("postgres", session.serverFacts());
             ctx.info("seeding " + rows + " transactions in schema " + session.schema());
-            TransactionHistory.Dataset data = TransactionHistory.seed(c, spec.seed(), Math.max(100, rows / 50), rows);
+            TransactionHistory.Dataset data = TransactionHistory.seed(c, spec.longParam("dataSeed"), Math.max(100, rows / 50), rows);
             details.put("dataset", data.toMap());
             try (Statement st = c.createStatement()) {
                 st.execute(FEED_INDEX);

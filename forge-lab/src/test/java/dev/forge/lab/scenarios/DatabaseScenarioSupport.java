@@ -44,10 +44,15 @@ final class DatabaseScenarioSupport {
 
     static ScenarioResult run(PostgreSQLContainer pg, Path work, String scenario, String variant, Map<String, Object> params,
                               int trials, String runId) throws Exception {
+        return run(pg, work, scenario, variant, params, trials, runId, 42);
+    }
+
+    static ScenarioResult run(PostgreSQLContainer pg, Path work, String scenario, String variant, Map<String, Object> params,
+                              int trials, String runId, long runSeed) throws Exception {
         Scenario s = ScenarioCatalog.find(scenario).orElseThrow();
         ParameterValidator.Result v = ParameterValidator.validate(s.descriptor(), variant, params, trials, 0);
         assertThat(v.errors()).isEmpty();
-        RunSpec spec = new RunSpec(runId, scenario, s.descriptor().version(), variant, v.params(), 42, v.trials(), v.warmupTrials());
+        RunSpec spec = new RunSpec(runId, scenario, s.descriptor().version(), variant, v.params(), runSeed, v.trials(), v.warmupTrials());
         return s.run(spec, context(pg, work));
     }
 

@@ -74,11 +74,12 @@ class DatabaseScenariosTest {
 
     @Test
     @SuppressWarnings("unchecked")
-    void sameSeedSameDataSoEveryVariantSeesTheSameProbeResult() throws Exception {
+    void sameDataSeedSameDataSoEveryVariantSeesTheSameProbeResultWhateverTheRunSeed() throws Exception {
         Set<Object> checksums = new HashSet<>();
+        long runSeed = 1;
         for (String variant : List.of("no-index", "covering-index")) {
             ScenarioResult r = DatabaseScenarioSupport.run(postgres, work, IndexLookupScenario.ID, variant, SMALL, 1,
-                    DatabaseScenarioSupport.newRunId());
+                    DatabaseScenarioSupport.newRunId(), runSeed++ * 7_777);
             Map<String, Object> probe = (Map<String, Object>) database(r).get("probe");
             assertThat((Long) probe.get("rows")).isPositive();
             checksums.add(probe.get("checksum"));

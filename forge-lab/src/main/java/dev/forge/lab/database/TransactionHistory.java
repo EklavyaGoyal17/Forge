@@ -24,6 +24,16 @@ import java.util.Map;
  */
 public final class TransactionHistory {
 
+    /**
+     * The parameter every Database Studio scenario uses for its data. It is deliberately separate
+     * from the run seed: runs that are compared must see the same rows, so the dataset is part of
+     * the configuration (and a different value shows up as a parameter difference).
+     */
+    public static dev.forge.lab.scenario.ParameterSpec dataSeedParameter() {
+        return dev.forge.lab.scenario.ParameterSpec.integer("dataSeed", "Data seed", 1, 1, 1_000_000, null,
+                "Seed of the synthetic data (and of which accounts are queried). Keep it equal across runs you compare: a different value is a different dataset.");
+    }
+
     private TransactionHistory() {
     }
 

@@ -86,6 +86,7 @@ public final class IndexLookupScenario implements Scenario {
             "How much of a lookup's cost is finding the rows, and which index shape lets PostgreSQL skip the table entirely?",
             null,
             List.of(
+                    TransactionHistory.dataSeedParameter(),
                     ParameterSpec.integer("rows", "Transactions", 500_000, 10_000, 2_000_000, "rows",
                             "Rows seeded into txn (deterministic from the run seed)."),
                     ParameterSpec.integer("accounts", "Accounts", 10_000, 100, 100_000, "accounts",
@@ -157,6 +158,7 @@ public final class IndexLookupScenario implements Scenario {
         int accounts = spec.intParam("accounts");
         int windowDays = spec.intParam("windowDays");
         int perTrial = spec.intParam("queriesPerTrial");
+        long dataSeed = spec.longParam("dataSeed");
         Instant from = HISTORY_END.minus(windowDays, ChronoUnit.DAYS);
 
         ScenarioResult.Builder result = ScenarioResult.builder();
@@ -165,7 +167,7 @@ public final class IndexLookupScenario implements Scenario {
             Map<String, Object> details = new LinkedHashMap<>();
             details.put("postgres", session.serverFacts());
             ctx.info("seeding " + rows + " transactions over " + accounts + " accounts in schema " + session.schema());
-            TransactionHistory.Dataset data = TransactionHistory.seed(c, spec.seed(), accounts, rows);
+            TransactionHistory.Dataset data = TransactionHistory.seed(c, dataSeed, accounts, rows);
             ctx.info(String.format("seeded in %.0f ms (txn %.1f MB)", data.seedMs(), data.txnMb()));
             details.put("dataset", data.toMap());
 
@@ -188,7 +190,7 @@ public final class IndexLookupScenario implements Scenario {
             details.put("index", index);
             details.put("queries", List.of(Map.of("label", "lookup", "sql", QUERY)));
 
-            long probeAccount = 1 + Math.floorMod(spec.seed(), accounts);
+            long probeAccount = 1 + Math.floorMod(dataSeed * 7919, accounts);
             String probeSql = QUERY.replace("account_id = ?", "account_id = " + probeAccount)
                     .replace("created_at >= ?", "created_at >= timestamptz '" + from + "'");
             Probe probe = probe(c, probeAccount, from);
@@ -200,7 +202,7 @@ public final class IndexLookupScenario implements Scenario {
                 for (int t = 0; t < total; t++) {
                     ctx.checkCancelled();
                     boolean warmup = t < spec.warmupTrials();
-                    Random random = new Random(spec.seed() * 31 + t);
+                    Random random = new Random(dataSeed * 31 + t);   // the same accounts for every variant: a paired comparison
                     double[] ms = new double[perTrial];
                     long returned = 0;
                     for (int q = 0; q < perTrial; q++) {
