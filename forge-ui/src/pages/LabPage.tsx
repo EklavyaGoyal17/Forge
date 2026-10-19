@@ -17,6 +17,14 @@ const LAB_INTRO: Partial<Record<Lab, { heading: string; points: string[] }>> = {
       'Neither proves the absence of bugs: stress testing samples schedules; the explorer is exhaustive only at its granularity and assumes sequential consistency (no JMM reorderings).',
     ],
   },
+  PERFORMANCE: {
+    heading: 'Load arrives whether or not you are ready',
+    points: [
+      'Requests are sent at a constant rate (open model), like independent users. A closed loop of N virtual users slows down with the server and hides overload.',
+      'Client latency is measured from the moment each request should have been sent, so time spent waiting for a free connection counts. The latency from the actual send is shown next to it, so you can see how much a naive measurement would hide.',
+      'The service runs on 127.0.0.1 inside the same runner JVM as the load generator: they share the CPU and the garbage collector, and nothing leaves the machine.',
+    ],
+  },
   ALGORITHMS: {
     heading: 'Complexity is a growth rate, not a time',
     points: [
