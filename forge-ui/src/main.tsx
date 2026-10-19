@@ -27,6 +27,7 @@ const router = createBrowserRouter([
       { path: 'experiments', element: <ExperimentsPage /> },
       { path: 'experiments/new', element: <NewExperimentPage /> },
       { path: 'experiments/:id', element: <ExperimentPage /> },
+      { path: 'labs/performance', element: <LabPage lab="PERFORMANCE" /> },
       { path: 'labs/concurrency', element: <LabPage lab="CONCURRENCY" /> },
       { path: 'labs/algorithms', element: <LabPage lab="ALGORITHMS" /> },
       { path: 'labs/jvm', element: <LabPage lab="JVM" /> },

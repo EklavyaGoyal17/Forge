@@ -141,11 +141,91 @@ export interface JmhDetails {
   jmhVersion: string
 }
 
+/** HdrHistogram summary in milliseconds; only `count` when the histogram is empty. */
+export interface LatencySummary {
+  count: number
+  meanMs?: number
+  minMs?: number
+  p50Ms?: number
+  p90Ms?: number
+  p95Ms?: number
+  p99Ms?: number
+  p999Ms?: number
+  maxMs?: number
+}
+
+export interface SpectrumPoint {
+  percentile: number
+  valueMs: number
+  /** false when the sample has fewer than 1/(1-p) values, i.e. the percentile is effectively the maximum */
+  resolvable: boolean
+}
+
+export interface LoadSeriesPoint {
+  tMs: number
+  offered: number
+  completed: number
+  errors: number
+  p50Ms?: number
+  p99Ms?: number
+  maxMs?: number
+}
+
+export interface HttpLoadTrial {
+  trial: number
+  scheduled: number
+  offered: number
+  sent: number
+  ok: number
+  httpErrors: number
+  failures: number
+  timeouts: number
+  unfinished: number
+  achievedRps: number
+  serverErrors: number
+  serverMeasuredRequests: number
+  occupancyMs: number | null
+  littleBoundRps: number | null
+  client: LatencySummary
+  uncorrected: LatencySummary
+  service: LatencySummary
+  queueWait: LatencySummary
+  timerLag: LatencySummary
+  measureStartMs: number
+  measureEndMs: number
+  series: LoadSeriesPoint[]
+}
+
+export type LatencyKind = 'client' | 'uncorrected' | 'service' | 'queueWait'
+
+export interface HttpLoadDetails {
+  design: string
+  bindAddress: string
+  /** 0 = unbounded (virtual threads) */
+  workers: number
+  config: {
+    rate: number
+    warmupMs: number
+    durationMs: number
+    poolSize: number
+    downstreamMs: number
+    cpuWorkUs: number
+    cpuIterations: number
+    iterationsPerMicro: number
+    connections: number
+    requestTimeoutMs: number
+    windowMs: number
+  }
+  trials: HttpLoadTrial[]
+  aggregate: Record<LatencyKind, LatencySummary> & { spectrum: Record<LatencyKind, SpectrumPoint[]> }
+  histogram: { unit: string; significantDigits: number; highestTrackableMs: number }
+}
+
 export interface ScenarioResult {
   trials: Trial[]
   invariant: { description: string | null; checked: number; violations: number; held: boolean | null }
   observations: string[]
-  details: { explorer?: ExplorerDetails; jmh?: JmhDetails; [k: string]: unknown }
+  details: { explorer?: ExplorerDetails; jmh?: JmhDetails; httpLoad?: HttpLoadDetails; [k: string]: unknown }
 }
 
 export interface Run {

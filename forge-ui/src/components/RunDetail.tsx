@@ -6,6 +6,7 @@ import { api } from '../lib/api'
 import { bytes, duration, fmt, pct, runDuration, toNumber } from '../lib/format'
 import { TrialChart } from './charts'
 import { ExplorerView } from './ExplorerView'
+import { HttpLoadView } from './HttpLoadView'
 import { Badge, Button, InvariantBadge, Stat, StatusPill, Tabs, cx } from './ui'
 
 type Tab = 'results' | 'timeline' | 'artifacts' | 'environment' | 'config'
@@ -107,6 +108,7 @@ function Results({ view, descriptor }: { view: RunView; descriptor: ScenarioDesc
   const spec: MetricSpec | undefined = descriptor.metrics.find((m) => m.name === chosen)
   const explorer = result.details.explorer
   const jmh = result.details.jmh
+  const httpLoad = result.details.httpLoad
 
   return (
     <div className="flex flex-col gap-5">
@@ -127,6 +129,8 @@ function Results({ view, descriptor }: { view: RunView; descriptor: ScenarioDesc
       </div>
 
       {explorer && <ExplorerView details={explorer} />}
+
+      {httpLoad && <HttpLoadView details={httpLoad} />}
 
       {!explorer && chosen && (
         <div className="flex flex-col gap-2">

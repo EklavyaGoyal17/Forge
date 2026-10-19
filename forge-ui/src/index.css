@@ -30,6 +30,8 @@
   --info-soft: rgb(90 169 240 / 0.14);
   --series-1: #5aa9f0;
   --series-2: #f2a541;
+  --series-3: #b48cf2;
+  --series-4: #4cc3b5;
   --grid: #222a38;
   --code-bg: #0f131a;
   color-scheme: dark;
@@ -58,6 +60,8 @@
   --info-soft: rgb(31 111 191 / 0.10);
   --series-1: #1f6fbf;
   --series-2: #c27412;
+  --series-3: #7a4fc4;
+  --series-4: #12867a;
   --grid: #e6e9ef;
   --code-bg: #f7f8fa;
   color-scheme: light;
