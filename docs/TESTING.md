@@ -63,6 +63,12 @@ Deterministic tests with exact expected counts derived by hand:
   address, worker counts) — never latency or throughput values, which depend on the machine.
 * Parameter bounds keep the load small; a run whose trials cannot finish before the deadline is refused.
 
+### Regression gate (`forge-server/.../analysis/RegressionGateTest`)
+Comparisons built from fixed samples: a worse primary metric whose interval excludes 1.0 is a
+regression; better is an improvement; overlapping samples are "no difference detected"; different
+parameters, environment or scenario version yield NOT_COMPARABLE; a newly violated invariant is a
+regression even when the metric improved; secondary regressions are listed but do not gate.
+
 ### Runner protocol (`forge-lab/.../runner/RunnerProcessTest`)
 Launches `RunnerMain` as a real child process: a valid spec produces a result with environment
 and JVM flags; invalid parameters, unknown scenarios and non-JSON input exit with code 2 without
@@ -79,7 +85,8 @@ Uses deliberately misbehaving "runners" (`MisbehavingRunners`):
 
 ### End-to-end (`forge-server/.../ExperimentFlowIntegrationTest`, Testcontainers PostgreSQL 17)
 HTTP API → Flyway schema → DB-backed queue → isolated runner JVM → stored results → comparison →
-review board → Markdown report; field-level 400s; 404s; a run that outlives its timeout ends
+review board → Markdown report; pinned-baseline regression gate (pin/unpin, a parameter change is
+NOT_COMPARABLE, report section, deleting an experiment whose run is pinned); field-level 400s; 404s; a run that outlives its timeout ends
 `TIMED_OUT`; a running run can be cancelled.
 
 ### Packaged UI serving (`forge-server/.../UiConfigTest`)
@@ -93,6 +100,11 @@ bug: the first container build served `index.html` but 404'd every asset.)
 * Trace rendering of a deadlock with its wait-for cycle.
 * Run configuration form: variants disabled outside their supported modes, mode-specific parameters, client-side bounds mirroring the server,
   variant source display, submission payload, explore mode forcing a single trial.
+
+### Frontend: regression panel (`forge-ui/src/test/regression.test.tsx`)
+Nothing renders until a baseline is pinned; each checked run shows its gate, ratio, interval,
+reasons and non-gating secondary regressions; a run with different parameters shows "not
+comparable" even when its raw comparison is directional.
 
 ### Frontend: HTTP load renderer (`forge-ui/src/test/httpLoad.test.tsx`)
 * Per-trial client percentile table plus the merged-histogram row; error counts; p99.9 hidden when

@@ -7,7 +7,7 @@ or a recorded manual check. Status values: `done`, `in progress`, `not started`.
 |---|---|---|
 | 0 | Architecture & documentation | done |
 | 1 | Working experiment platform | done (CI workflow not yet executed on GitHub) |
-| 2 | Performance lab (HTTP) | in progress (core done; k6 adapter and pinned-baseline regression detection not started) |
+| 2 | Performance lab (HTTP) | done except the k6 adapter (deferred by design, see below) |
 | 3 | Concurrency lab | in progress (core exercises done) |
 | 4 | Database studio | not started |
 | 5 | JVM lab | not started |
@@ -39,8 +39,8 @@ fully verified; `[ ]` = not done.
 - [x] Embedded loopback target service with configurable CPU work, blocking I/O, and worker-pool size. *(bound to 127.0.0.1 on an ephemeral port inside the runner JVM, checked at start-up; four designs: small blocking pool, 8× pool, non-blocking downstream, virtual threads)*
 - [x] Client-observed latency vs server-side service time vs queue wait reported separately. *(plus worker time per request and the Little's-law capacity it implies)*
 - [x] Warm-up and sustained phases, repeated trials, p50/p90/p95/p99, error rate. *(`PerformanceScenarioTest` checks structure and request accounting. Recorded end-to-end check on 2026-10-19 through the API on the development machine: at 300 req/s, 4 workers and a 20 ms downstream, the blocking pool completed a median of 188 req/s against a Little's-law bound of 188 req/s, and its p99 reached the 2 s timeout while a send-time measurement reported 346 ms; the non-blocking design completed 300 req/s with p99 24.5 ms)*
-- [ ] k6 adapter (`grafana/k6` container) against the same target when Docker is available.
-- [ ] Regression detection against a pinned baseline.
+- [ ] k6 adapter (`grafana/k6` container) against the same target when Docker is available. *(deferred by design: a `grafana/k6` container would need Docker access from the runner (the runner has an empty environment and no Docker socket — see SECURITY.md) and, on Docker Desktop, a target bound beyond 127.0.0.1 so the container can reach it. Both weaken the isolation model; revisit together with the dedicated runner container in Phase 9)*
+- [x] Regression detection against a pinned baseline. *(pin a succeeded run per experiment; every other succeeded run is gated: REGRESSION only when comparable — same parameters, scenario version, environment — and the primary metric's bootstrap CI excludes 1.0 on the worse side, or when an invariant the baseline held is violated. `RegressionGateTest` covers the rules; `ExperimentFlowIntegrationTest.pinnedBaselineGatesEveryOtherRun` covers pin/unpin, NOT_COMPARABLE on a parameter change, the report section and deletion of a pinned experiment)*
 
 ## Phase 3 — Concurrency lab
 - [x] Lost update: unsynchronized / volatile / synchronized / ReentrantLock / AtomicLong / LongAdder.

@@ -128,7 +128,7 @@
   capacity bound shown next to the achieved throughput.
 * **Trade-off:** client and server share one JVM, CPU and GC; the generator relies on OS timers
   (its wake-up lag is reported per trial). Both are stated as caveats on every result.
-* **Not yet:** k6 adapter (`grafana/k6`) and regression detection against a pinned baseline.
+* **Not yet:** a k6 adapter (`grafana/k6`); deferred by design: a `grafana/k6` container would need Docker access from the runner (the runner has an empty environment and no Docker socket — see SECURITY.md) and, on Docker Desktop, a target bound beyond 127.0.0.1 so the container can reach it. Both weaken the isolation model; revisit together with the dedicated runner container in Phase 9.
 
 ## 4. Technology choices
 
@@ -150,7 +150,8 @@ experiment 1 ──── * run 1 ──── * run_event
 ```
 
 * `experiment` — title, engineering question, hypothesis, scenario id, notebook fields
-  (observations, alternative explanations, decision, follow-ups), status, tags.
+  (observations, alternative explanations, decision, follow-ups), status, tags, and an optional
+  pinned baseline run (V2) that every other succeeded run is checked against for regressions.
 * `run` — variant, parameters (`jsonb`), seed, trials, role (`BASELINE`/`CANDIDATE`/`EXPLORATORY`),
   lifecycle status (`QUEUED → RUNNING → SUCCEEDED | FAILED | CANCELLED | TIMED_OUT`),
   environment (`jsonb`), result (`jsonb`), exit code, timing.
@@ -188,7 +189,7 @@ explicit and reviewable.
 
 | Component | Phase | Notes |
 |---|---|---|
-| Performance Lab additions | 2 | k6 adapter via the `grafana/k6` image (when Docker is available) against the same loopback target; regression detection against a pinned baseline run. The open-model generator and embedded target are implemented (ADR-009). |
+| k6 adapter | 2 (deferred) | Needs Docker access from the runner and a target reachable from a container; to be designed with the dedicated runner container (Phase 9). The open-model generator, embedded target and pinned-baseline regression gate are implemented. |
 | Database Studio | 4 | Disposable `forge_lab` database, separate role with no access to platform tables, seeded data generation, `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON)` capture. |
 | JVM Lab | 5 | JFR recording (`-XX:StartFlightRecording`) in the child JVM, parsed with `jdk.jfr.consumer`. |
 | Failure Lab | 6 | Fault-injecting proxy in front of embedded downstream services. |

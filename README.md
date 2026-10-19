@@ -20,13 +20,14 @@ there are no placeholder charts.
 | Isolated runner: child JVM per run, heap cap, empty environment, private temp dir, timeout, output caps, process-tree kill | ✅ |
 | Durable run queue (DB rows claimed with `FOR UPDATE SKIP LOCKED`), serial by default, cancel | ✅ |
 | Baseline vs candidate comparison: bootstrap CI of ratio of medians, Mann–Whitney U, parameter/environment diffs | ✅ |
+| Regression gate: pin a baseline run; every other run is checked against it (and refused a verdict when not comparable) | ✅ |
 | Engineering Review Board: explicit evidence rubric + reviewer questions | ✅ |
 | Markdown report export (PDF via browser print) | ✅ |
 | **Concurrency Lab** — lost update (6 variants), deadlock (3), visibility (3), backpressure under overload (5); stress mode + deterministic interleaving explorer | ✅ |
 | **Algorithm Lab** — membership lookup (4 variants) measured with JMH | ✅ |
 | **Performance Lab** — thread-pool starvation: an embedded loopback HTTP service (small blocking pool, 8× pool, non-blocking downstream, virtual threads) under an open-model load; client latency from the intended send time (coordinated-omission corrected, HdrHistogram), server service time and queue wait, Little's-law capacity | ✅ |
 | Web UI: dashboard, experiment workspace, run evidence, compare, notebook, review, command palette, keyboard shortcuts, dark/light | ✅ |
-| Performance lab k6 adapter and pinned-baseline regression detection, Database Studio, JVM lab (JFR), Failure lab, AI investigator, Challenge arena | planned — see [ROADMAP](docs/ROADMAP.md) |
+| Performance lab k6 adapter (deferred by design), Database Studio, JVM lab (JFR), Failure lab, AI investigator, Challenge arena | planned — see [ROADMAP](docs/ROADMAP.md) |
 
 ## Quick start
 

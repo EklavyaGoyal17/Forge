@@ -59,6 +59,17 @@ environment or an unstable workload, and comparisons will need more trials.
   parameters, different JVM version, different available processor count, or different max heap
   produce warnings, because the comparison would then confound the variant with the environment.
 
+### Regression gate (pinned baseline)
+An experiment can pin one succeeded run as its baseline; every other succeeded run is checked
+against it with the comparison above. The gate is conservative:
+* **REGRESSION** — the runs are comparable and the primary metric's 95 % interval lies entirely on
+  the worse side of 1.0, *or* the baseline held its invariant and the run violated it (a correctness
+  regression always counts, whatever the timing says).
+* **NOT_COMPARABLE** — parameters, scenario version or environment differ, or no primary-metric
+  value is shared. No verdict is given, because any difference would be confounded.
+* Otherwise the comparison's own verdict (improvement, no difference detected, identical, not
+  directional). Regressions in secondary metrics are listed but do not gate.
+
 ### What we deliberately do not do
 * No p-value thresholds presented as "significant/not significant" in isolation.
 * No averaging of percentiles across runs (percentiles do not compose).
