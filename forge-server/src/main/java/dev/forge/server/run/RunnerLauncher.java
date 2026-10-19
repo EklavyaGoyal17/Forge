@@ -2,6 +2,8 @@ package dev.forge.server.run;
 
 import dev.forge.lab.runner.RunnerMain;
 import dev.forge.lab.scenario.RunSpec;
+import dev.forge.lab.scenario.ScenarioCatalog;
+import dev.forge.lab.scenario.VariantSpec;
 import dev.forge.server.config.Json;
 import dev.forge.server.config.RunnerProperties;
 import org.slf4j.Logger;
@@ -36,6 +38,8 @@ import java.util.stream.Stream;
  *   <li>Arguments are passed as an array plus a JVM {@code @argfile}; no shell is ever involved.</li>
  *   <li>The child's environment is cleared; only what the JVM needs on this OS is re-added.</li>
  *   <li>Heap ceiling, OOM-exit, optional processor-count cap, private temp/working directory.</li>
+ *   <li>Per-variant JVM flags (JVM Lab JIT modes) come from the compiled scenario descriptor, never
+ *       from the request, and must also be on {@link #ALLOWED_VARIANT_FLAGS}.</li>
  *   <li>Wall-clock timeout, cooperative cancellation, stdout/stderr byte caps; on any of these the
  *       whole process tree is destroyed.</li>
  * </ul>
@@ -45,6 +49,13 @@ public class RunnerLauncher {
 
     private static final Logger log = LoggerFactory.getLogger(RunnerLauncher.class);
     private static final boolean WINDOWS = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows");
+
+    /**
+     * The only flags a scenario variant may add to the runner command line: execution-mode switches
+     * that change how code is compiled, not what the process may access.
+     */
+    static final java.util.Set<String> ALLOWED_VARIANT_FLAGS = java.util.Set.of(
+            "-Xint", "-XX:-TieredCompilation", "-XX:TieredStopAtLevel=1");
 
     private final RunnerProperties props;
     private final Json json;
@@ -85,6 +96,10 @@ public class RunnerLauncher {
     }
 
     List<String> jvmArguments(int heapMb, int timeoutSeconds, Path workDir) {
+        return jvmArguments(heapMb, timeoutSeconds, workDir, List.of());
+    }
+
+    List<String> jvmArguments(int heapMb, int timeoutSeconds, Path workDir, List<String> variantFlags) {
         List<String> args = new ArrayList<>();
         args.add("-Xms" + Math.min(heapMb, 64) + "m");
         args.add("-Xmx" + heapMb + "m");
@@ -93,6 +108,7 @@ public class RunnerLauncher {
         if (props.activeProcessorCount() > 0) {
             args.add("-XX:ActiveProcessorCount=" + props.activeProcessorCount());
         }
+        args.addAll(vetVariantFlags(variantFlags));
         args.add("-Djava.io.tmpdir=" + workDir);
         args.add("-Dforge.workDir=" + workDir);
         args.add("-Dforge.timeoutMillis=" + timeoutSeconds * 1000L);
@@ -104,6 +120,23 @@ public class RunnerLauncher {
         return args;
     }
 
+    /** The JVM flags the run's variant declares in its descriptor (empty for almost every scenario). */
+    static List<String> variantFlags(RunSpec spec) {
+        return ScenarioCatalog.find(spec.scenarioId())
+                .flatMap(s -> s.descriptor().variant(spec.variant()))
+                .map(VariantSpec::jvmFlags)
+                .orElse(List.of());
+    }
+
+    static List<String> vetVariantFlags(List<String> flags) {
+        for (String f : flags) {
+            if (!ALLOWED_VARIANT_FLAGS.contains(f)) {
+                throw new IllegalStateException("variant JVM flag not on the allow-list: " + f);
+            }
+        }
+        return flags;
+    }
+
     /** Tests substitute a deliberately misbehaving main class to exercise the kill paths. */
     void useMainClassForTesting(String className) {
         this.mainClass = className;
@@ -111,7 +144,7 @@ public class RunnerLauncher {
 
     private Outcome supervise(RunSpec spec, int heapMb, int timeoutSeconds, Path workDir,
                               Consumer<JsonNode> onMessage, CancelSignal cancel) throws IOException, InterruptedException {
-        List<String> jvmArgs = jvmArguments(heapMb, timeoutSeconds, workDir);
+        List<String> jvmArgs = jvmArguments(heapMb, timeoutSeconds, workDir, variantFlags(spec));
         // An @argfile avoids the ~32k command-line limit on Windows for long development classpaths.
         Path argFile = workDir.resolve("jvm.args");
         Files.writeString(argFile, String.join("\n", jvmArgs.stream().map(RunnerLauncher::quoteArg).toList()),

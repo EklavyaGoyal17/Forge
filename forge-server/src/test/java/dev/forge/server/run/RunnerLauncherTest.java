@@ -15,6 +15,7 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Exercises the process-isolation paths of the launcher directly, without Spring or a database. */
 class RunnerLauncherTest {
@@ -31,6 +32,34 @@ class RunnerLauncherTest {
     private static RunSpec spec(String id) {
         return new RunSpec(id, "concurrency.lost-update", 1, "atomic-cas",
                 Map.of("mode", "stress", "threads", 2L, "depositsPerThread", 100L), 1, 2, 0);
+    }
+
+    @Test
+    void jitModeVariantsAddTheirDeclaredFlagAndOtherVariantsAddNone() throws Exception {
+        RunnerLauncher l = launcher(1 << 20);
+        RunSpec interpreter = new RunSpec("x", "jvm.warmup", 1, "interpreter", Map.of(), 1, 1, 0);
+        RunSpec tiered = new RunSpec("y", "jvm.warmup", 1, "tiered", Map.of(), 1, 1, 0);
+        assertThat(RunnerLauncher.variantFlags(interpreter)).containsExactly("-Xint");
+        assertThat(RunnerLauncher.variantFlags(tiered)).isEmpty();
+        assertThat(RunnerLauncher.variantFlags(spec("plain"))).isEmpty();
+        List<String> args = l.jvmArguments(128, 30, root, RunnerLauncher.variantFlags(interpreter));
+        // before the main class, so the JVM (not the runner) receives it
+        assertThat(args.indexOf("-Xint")).isBetween(0, args.indexOf("-cp"));
+    }
+
+    @Test
+    void flagsOutsideTheAllowListAreRefused() {
+        assertThatThrownBy(() -> RunnerLauncher.vetVariantFlags(List.of("-XX:+UnlockDiagnosticVMOptions")))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("allow-list");
+        assertThatThrownBy(() -> RunnerLauncher.vetVariantFlags(List.of("-javaagent:/tmp/x.jar")))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(RunnerLauncher.vetVariantFlags(List.of("-XX:-TieredCompilation"))).containsExactly("-XX:-TieredCompilation");
+    }
+
+    @Test
+    void everyVariantFlagDeclaredInTheCatalogIsOnTheAllowList() {
+        dev.forge.lab.scenario.ScenarioCatalog.descriptors().forEach(d -> d.variants().forEach(v ->
+                assertThat(RunnerLauncher.ALLOWED_VARIANT_FLAGS).as("%s/%s", d.id(), v.id()).containsAll(v.jvmFlags())));
     }
 
     @Test
