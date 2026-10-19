@@ -24,6 +24,8 @@ import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -160,7 +162,7 @@ public final class LockContentionScenario implements Scenario {
                     new VariantSpec("striped", "Per-thread state", "Each thread accumulates privately and merges once at the end.", true, SRC + "striped")),
             List.of(
                     new MetricSpec("elapsedMs", "Elapsed", "ms", Direction.LOWER_IS_BETTER,
-                            "Wall-clock time from releasing the workers until the last one finished."),
+                            "Wall-clock time from releasing the workers until the last one finished its increments."),
                     new MetricSpec("mopsPerSec", "Throughput", "M increments/s", Direction.HIGHER_IS_BETTER,
                             "Total increments divided by elapsed time."),
                     new MetricSpec("blockedCount", "Blocked (monitor)", "times", Direction.LOWER_IS_BETTER,
@@ -187,6 +189,7 @@ public final class LockContentionScenario implements Scenario {
                     "Short waits are often absorbed by spinning: a contended acquisition that succeeds while spinning is neither BLOCKED nor parked and appears in no counter.",
                     "With more threads than cores, waiting includes time the holder was descheduled by the OS; results depend on the cores visible to the runner (recorded in the environment).",
                     "Thread contention monitoring (ThreadMXBean.setThreadContentionMonitoringEnabled) is switched on for the run; it adds a small cost to every block/wait.",
+                    "Workers wait at the start and end of a trial by spinning, so that the counters are read while none is blocked or waiting; with more threads than cores, spinning workers take CPU from the ones still working.",
                     "The JFR recording covers the measured trials only."));
 
     @Override
@@ -282,54 +285,67 @@ public final class LockContentionScenario implements Scenario {
         long waitedMs;
     }
 
+    /**
+     * One trial. The JVM's per-thread counters are read by this (driver) thread in one
+     * {@code getThreadInfo(long[])} call before and after, while every worker is spinning — neither
+     * blocked nor waiting. (Workers reading their own counters at the same moment contended on a
+     * lock inside the management code and showed up as contention themselves.)
+     */
     private static Outcome trial(String variant, int threads, int increments, int rounds, ThreadMXBean tmx)
             throws InterruptedException {
         Accumulator acc = accumulator(variant, threads);
         boolean counters = tmx.isThreadContentionMonitoringEnabled();
-        long[][] stats = new long[threads][4];
-        // spin-wait start gate: a latch would itself park every worker and show up as contention
-        java.util.concurrent.atomic.AtomicBoolean go = new java.util.concurrent.atomic.AtomicBoolean();
-        java.util.concurrent.atomic.AtomicInteger ready = new java.util.concurrent.atomic.AtomicInteger();
+        AtomicBoolean go = new AtomicBoolean();
+        AtomicBoolean release = new AtomicBoolean();
+        AtomicInteger ready = new AtomicInteger();
+        AtomicInteger finished = new AtomicInteger();
+        long[] endNanos = new long[threads];
         Thread[] workers = new Thread[threads];
         for (int t = 0; t < threads; t++) {
             int id = t;
             workers[t] = Thread.ofPlatform().name("contender-" + t).start(() -> {
-                ThreadInfo before = counters ? tmx.getThreadInfo(Thread.currentThread().threadId()) : null;
                 ready.incrementAndGet();
-                while (!go.get()) {
+                while (!go.get()) {                  // spin gates: a latch would park every worker
                     Thread.onSpinWait();
                 }
                 for (int i = 0; i < increments; i++) {
                     acc.add(id, i, rounds);
                 }
                 acc.finish(id);
-                if (counters) {
-                    ThreadInfo after = tmx.getThreadInfo(Thread.currentThread().threadId());
-                    stats[id][0] = after.getBlockedCount() - before.getBlockedCount();
-                    stats[id][1] = after.getBlockedTime() - before.getBlockedTime();
-                    stats[id][2] = after.getWaitedCount() - before.getWaitedCount();
-                    stats[id][3] = after.getWaitedTime() - before.getWaitedTime();
+                endNanos[id] = System.nanoTime();
+                finished.incrementAndGet();          // publishes endNanos[id]
+                while (!release.get()) {
+                    Thread.onSpinWait();
                 }
             });
         }
+        long[] ids = java.util.Arrays.stream(workers).mapToLong(Thread::threadId).toArray();
         while (ready.get() < threads) {
             Thread.onSpinWait();
         }
+        ThreadInfo[] before = counters ? tmx.getThreadInfo(ids) : null;
         long t0 = System.nanoTime();
         go.set(true);
+        while (finished.get() < threads) {
+            Thread.sleep(1);                         // the driver's own waiting is not measured
+        }
+        ThreadInfo[] after = counters ? tmx.getThreadInfo(ids) : null;
+        release.set(true);
         for (Thread w : workers) {
-            w.join();                                // join() publishes the workers' writes to stats
+            w.join();
         }
         Outcome o = new Outcome();
-        o.nanos = System.nanoTime() - t0;
+        o.nanos = java.util.Arrays.stream(endNanos).max().orElse(t0) - t0;
         o.count = acc.count();
         o.checksum = acc.checksum();
         o.counters = counters;
-        for (long[] s : stats) {
-            o.blockedCount += s[0];
-            o.blockedMs += s[1];
-            o.waitedCount += s[2];
-            o.waitedMs += s[3];
+        if (counters) {
+            for (int i = 0; i < threads; i++) {
+                o.blockedCount += after[i].getBlockedCount() - before[i].getBlockedCount();
+                o.blockedMs += after[i].getBlockedTime() - before[i].getBlockedTime();
+                o.waitedCount += after[i].getWaitedCount() - before[i].getWaitedCount();
+                o.waitedMs += after[i].getWaitedTime() - before[i].getWaitedTime();
+            }
         }
         return o;
     }

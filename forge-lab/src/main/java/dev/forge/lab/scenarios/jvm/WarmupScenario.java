@@ -79,7 +79,7 @@ public final class WarmupScenario implements Scenario {
                     new MetricSpec("warmupCostMs", "Warm-up cost", "ms", Direction.LOWER_IS_BETTER,
                             "Time spent above the steady-state speed: Σ max(0, invocation − steady state)."),
                     new MetricSpec("invocationsToSteady", "Invocations to steady state", "calls", Direction.LOWER_IS_BETTER,
-                            "First invocation at which the rolling median of 25 invocations is within 1.5× the steady state."),
+                            "First invocation at which the rolling median of 25 invocations is within 20% of the steady state."),
                     new MetricSpec("compilations", "Compilations", "", Direction.NEUTRAL,
                             "Compilations of the kernel class recorded by JFR in this trial (including OSR)."),
                     new MetricSpec("c2AtInvocation", "C2 code from invocation", "", Direction.NEUTRAL,
@@ -251,14 +251,15 @@ public final class WarmupScenario implements Scenario {
     }
 
     /**
-     * First invocation at which a rolling median of 25 invocations reaches 1.5× the steady state.
+     * First invocation at which a rolling median of 25 invocations is within 20% of the steady state.
      * (Requiring it to stay there made the metric jump to the end of the series whenever a late
-     * stretch was slowed by something unrelated, such as OS scheduling.)
+     * stretch was slowed by something unrelated, such as OS scheduling. A looser 1.5× bound counted
+     * the C1 tier-3 plateau — measured at about 1.45× the C2 speed for this kernel — as steady.)
      */
     static int invocationsToSteady(long[] d, double steady) {
         int w = Math.min(25, d.length);
         for (int j = 0; j + w <= d.length; j++) {
-            if (JvmLab.median(d, j, j + w) <= 1.5 * steady) {
+            if (JvmLab.median(d, j, j + w) <= 1.2 * steady) {
                 return j;
             }
         }
