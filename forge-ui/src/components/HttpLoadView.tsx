@@ -112,7 +112,7 @@ export function HttpLoadView({ details }: { details: HttpLoadDetails }) {
                 <td className="num px-2.5 py-1.5">{fmt(t.client.maxMs)}</td>
                 <td className="num px-2.5 py-1.5">{fmt(t.achievedRps)}</td>
                 <td className={cx('num px-2.5 py-1.5', errorCount(t) > 0 && 'text-bad')}>
-                  {errorCount(t) === 0 ? '0' : `${fmt(errorCount(t))} (${fmt((100 * errorCount(t)) / Math.max(1, t.offered), 3)}%)`}
+                  {errorCount(t) === 0 ? '0' : `${fmt(errorCount(t))} (${((100 * errorCount(t)) / Math.max(1, t.offered)).toFixed(2)}%)`}
                 </td>
               </tr>
             ))}
