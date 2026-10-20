@@ -4,11 +4,11 @@ import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
 import dev.forge.lab.performance.CpuWork;
 import dev.forge.lab.performance.Histograms;
+import dev.forge.lab.performance.LoopbackHttpServer;
 import org.HdrHistogram.Histogram;
 
 import java.io.IOException;
 import java.io.OutputStream;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.URI;
 import java.nio.charset.StandardCharsets;
@@ -149,12 +149,7 @@ final class TargetService implements AutoCloseable {
             case VIRTUAL_THREADS -> virtualThreads(config);
         };
         try {
-            InetAddress loopback = InetAddress.getByAddress(new byte[] {127, 0, 0, 1});
-            HttpServer s = HttpServer.create(new InetSocketAddress(loopback, 0), 1024);
-            if (!s.getAddress().getAddress().isLoopbackAddress()) {
-                s.stop(0);
-                throw new IllegalStateException("target service must bind to loopback, got " + s.getAddress());
-            }
+            HttpServer s = LoopbackHttpServer.create(1024);
             s.createContext("/work", this::dispatch);
             s.setExecutor(wiring.executor());
             this.server = s;

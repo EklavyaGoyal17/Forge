@@ -1,15 +1,8 @@
 import { render, screen, within } from '@testing-library/react'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { DatabaseView, PlanTree, planRows } from '../components/DatabaseView'
 import type { DatabaseDetails, ExplainCapture, PlanNode } from '../lib/api'
 
-beforeAll(() => {
-  globalThis.ResizeObserver ??= class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  } as unknown as typeof ResizeObserver
-})
 
 // Shape of a real PostgreSQL 17 plan for the account-index variant (values shortened).
 const plan: PlanNode = {

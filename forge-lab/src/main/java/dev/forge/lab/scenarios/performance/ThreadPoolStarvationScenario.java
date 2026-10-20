@@ -54,7 +54,7 @@ public final class ThreadPoolStarvationScenario implements Scenario {
     private static final long TRIAL_OVERHEAD_NANOS = 1_000_000_000L;
 
     private static final ScenarioDescriptor DESCRIPTOR = new ScenarioDescriptor(
-            ID, 1, Lab.PERFORMANCE,
+            ID, 2, Lab.PERFORMANCE,           // v2: TCP_NODELAY on the embedded server (Nagle + delayed ACK added up to 40 ms on Linux)
             "Thread-pool starvation under open-model HTTP load",
             "An embedded HTTP service on loopback does CPU work and then waits on a slow downstream. Drive it at a constant arrival rate and watch what a small blocking pool, a bigger pool, a non-blocking design and virtual threads do to throughput, tail latency and queueing.",
             "When requests block a worker thread on a slow downstream, does throughput plateau at workers ÷ service time (Little's law), and what happens to tail latency once the offered rate exceeds it?",

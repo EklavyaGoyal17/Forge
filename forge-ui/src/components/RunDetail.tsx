@@ -8,6 +8,7 @@ import { TrialChart } from './charts'
 import { DatabaseView } from './DatabaseView'
 import { ExplorerView } from './ExplorerView'
 import { HttpLoadView } from './HttpLoadView'
+import { FailureView } from './FailureView'
 import { JvmView } from './JvmView'
 import { LivenessView } from './LivenessView'
 import { Badge, Button, InvariantBadge, Stat, StatusPill, Tabs, cx } from './ui'
@@ -124,6 +125,7 @@ function Results({ view, descriptor }: { view: RunView; descriptor: ScenarioDesc
   const spec: MetricSpec | undefined = descriptor.metrics.find((m) => m.name === chosen)
   const explorer = result.details.explorer
   const liveness = result.details.liveness
+  const failure = result.details.failure
   const jmh = result.details.jmh
   const httpLoad = result.details.httpLoad
   const database = result.details.database
@@ -156,6 +158,8 @@ function Results({ view, descriptor }: { view: RunView; descriptor: ScenarioDesc
       {database && <DatabaseView details={database} />}
 
       {jvm && <JvmView details={jvm} />}
+
+      {failure && <FailureView details={failure} />}
 
       {!explorer && !liveness && chosen && (
         <div className="flex flex-col gap-2">

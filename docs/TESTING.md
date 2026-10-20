@@ -110,6 +110,21 @@ regression; better is an improvement; overlapping samples are "no difference det
 parameters, environment or scenario version yield NOT_COMPARABLE; a newly violated invariant is a
 regression even when the metric improved; secondary regressions are listed but do not gate.
 
+### Failure Lab (`forge-lab/.../scenarios/failure/FailureLabTest`)
+* Circuit breaker on a fake clock: opens at the failure rate once `minCalls` are recorded, fails
+  fast during the cool-down, admits at most `probes` half-open calls, closes after successful probes,
+  reopens (and restarts the cool-down) on a failed probe, and lets old failures slide out of the
+  window.
+* The dependency against a real loopback server: added latency is applied, error share 1.0 answers
+  500, a dropped connection is an `IOException`, a restart refuses connections on the old port and
+  serves on a new one. (The test allows the dropped request to arrive twice because the JDK
+  `HttpClient` may resend it — found by this test.)
+* Seeded error selection is a function of seed and sequence and has the configured share.
+* Whole runs: a control run without a fault succeeds 100% with ≈ 1 attempt per request; immediate
+  retries multiply attempts under a total error fault; the breaker opens and short-circuits; the
+  retry budget caps retries and refuses some; plans that could exhaust local ports or whose fault
+  outlives the sustained phase are rejected. Recovery times and latencies are not asserted.
+
 ### Runner protocol (`forge-lab/.../runner/RunnerProcessTest`)
 Launches `RunnerMain` as a real child process: a valid spec produces a result with environment
 and JVM flags; invalid parameters, unknown scenarios and non-JSON input exit with code 2 without
@@ -144,6 +159,8 @@ bug: the first container build served `index.html` but 404'd every asset.)
 * Trace rendering of a deadlock with its wait-for cycle.
 * Liveness verdicts and witnesses: livelock cycle with one column per thread, prefix toggle,
   "holds" only for complete graphs, exploration errors shown instead of verdicts.
+* Failure timeline: breaker-open ranges, per-second rates, success / recovery / sustained-phase
+  attempts per request, trial switching, "no recovery" and control-run states.
 * Run configuration form: variants disabled outside their supported modes, mode-specific parameters, client-side bounds mirroring the server,
   variant source display, submission payload, explore mode forcing a single trial.
 

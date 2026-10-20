@@ -41,6 +41,14 @@ const LAB_INTRO: Partial<Record<Lab, { heading: string; points: string[] }>> = {
       'JIT modes (C1 only, C2 only, interpreter only) are real JVM flags on the runner process, taken from an allow-list. Warm-up is measured per method: every trial loads a fresh copy of the kernel class.',
     ],
   },
+  FAILURE: {
+    heading: 'Faults are injected only into a service that lives inside the run',
+    points: [
+      'Each trial starts its own inventory service on 127.0.0.1 inside the runner JVM, injects one planned fault (latency, HTTP 500s, dropped connections, a restart) and stops it. Nothing outside the runner process is ever a target.',
+      'The caller is driven at a constant rate, so a slow dependency builds a backlog instead of slowing the load down. The timeline shows each window: success, latency, attempts sent, the backlog and the breaker state.',
+      'Retry storms are capped: a run is refused if it could send more than 40,000 attempts, because every timed-out attempt closes a TCP connection.',
+    ],
+  },
   ALGORITHMS: {
     heading: 'Complexity is a growth rate, not a time',
     points: [

@@ -1,16 +1,8 @@
 import { render, screen, within } from '@testing-library/react'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { HttpLoadView, ninesX, rateSeries, spectrumRows } from '../components/HttpLoadView'
 import type { HttpLoadDetails, HttpLoadTrial, LatencySummary } from '../lib/api'
 
-beforeAll(() => {
-  // jsdom has no ResizeObserver; Recharts' ResponsiveContainer needs one to mount.
-  globalThis.ResizeObserver ??= class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  } as unknown as typeof ResizeObserver
-})
 
 const summary = (count: number, p50: number, p99: number, max: number): LatencySummary => ({
   count, meanMs: p50, minMs: p50 / 2, p50Ms: p50, p90Ms: p50 * 1.5, p95Ms: p50 * 1.8, p99Ms: p99, p999Ms: max * 0.99, maxMs: max,

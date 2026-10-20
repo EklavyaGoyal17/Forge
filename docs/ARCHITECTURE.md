@@ -215,6 +215,25 @@ known; a FIFO frontier keeps replay paths short. Threads mark progress with `Pro
 Alternative considered: bounded DFS with a step limit and a "looks periodic" heuristic. Rejected —
 it cannot separate unfair schedules from livelocks and gives no completeness claim.
 
+### ADR-013 — Failure Lab: faults inside a dependency the run owns, policies in plain code (implemented)
+The fault-injection target is an embedded HTTP service (`InventoryService`) started per trial inside
+the runner JVM on loopback, with a fixed worker pool and an unbounded queue. Faults — added latency,
+a seeded share of HTTP 500s, connections closed without a response, and a restart (listener closed,
+then a new instance on a new port found through an address supplier) — are switched by the scenario
+at planned times. The caller is driven by the Performance Lab's open-model generator, so a slow
+dependency builds a backlog instead of slowing the load.
+
+Client policies (no timeout, timeout, immediate retries, exponential backoff with full jitter, a
+token-bucket retry budget, a count-based circuit breaker) are ~150 lines of FORGE code rather than
+Resilience4j, so the code shown in the UI is the code that ran and every decision is visible. The
+per-window timeline (success by completion time, latency by intended time, attempts sent, sampled
+backlog, breaker state) is the evidence; recovery time is computed from it with stated thresholds.
+
+Alternatives considered: a TCP fault-injecting proxy (Toxiproxy) in a container — rejected for
+now because it needs Docker access from the runner and a network path out of it (the same reason the
+k6 adapter is deferred); faults inside the target give the same client-side behaviour for HTTP.
+Using Resilience4j — rejected for the lab (opaque in a teaching view); production code should use it.
+
 ## 4. Technology choices
 
 | Choice | Why | Trade-off |
@@ -278,6 +297,5 @@ explicit and reviewable.
 | Component | Phase | Notes |
 |---|---|---|
 | k6 adapter | 2 (deferred) | Needs Docker access from the runner and a target reachable from a container; to be designed with the dedicated runner container (Phase 9). The open-model generator, embedded target and pinned-baseline regression gate are implemented. |
-| Failure Lab | 6 | Fault injection inside an embedded downstream service; client resilience policies. |
 | AI Investigator | 7 | Provider-agnostic adapter; prompts built only from stored artifacts, with citations to run ids. |
 | Challenge Arena | 8 | Challenges = scenario + verification predicate over recorded results. |

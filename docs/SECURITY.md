@@ -50,6 +50,14 @@ network interface.
   runner and return only the summary; the file is deleted with the directory. Stack frames in the
   summary name only JDK and FORGE classes — there is no user code to leak.
 
+* **Fault injection targets only a service the run itself starts.** Failure Lab scenarios start
+  their dependency (`InventoryService`) inside the runner JVM, bound to `127.0.0.1` on an ephemeral
+  port and checked to be loopback at start-up; faults are switched on and off inside that object.
+  There is no parameter that names a host, port or URL, so a run cannot be pointed at anything else.
+* **Retry storms are bounded.** A Failure Lab run is refused when it could send more than 40,000
+  attempts (rate × duration × (1 + retries) × trials), because each timed-out attempt closes a TCP
+  connection and consumes a local port for the TIME_WAIT period.
+
 ### Container deployment (`docker-compose.yml`)
 * Server image runs as a non-root user.
 * `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, `read_only: true` root filesystem

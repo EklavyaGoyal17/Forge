@@ -8,3 +8,4 @@ forge-ui/dist/
 .DS_Store
 Thumbs.db
 .env
+*.tsbuildinfo

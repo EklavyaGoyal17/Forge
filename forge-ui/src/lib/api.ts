@@ -118,6 +118,59 @@ export interface ExplorerTrace {
   steps: ExplorerStep[]
 }
 
+export interface FailureSeriesPoint {
+  tMs: number
+  offered: number
+  completed: number
+  errors: number
+  p50Ms?: number
+  p99Ms?: number
+  maxMs?: number
+  attempts: number
+  backlog: number
+  /** 0 closed, 1 half-open, 2 open (worst seen in the window) */
+  breaker: number
+  successPercent: number | null
+}
+
+export interface FailureTrial {
+  trial: number
+  series: FailureSeriesPoint[]
+  offered: number
+  ok: number
+  httpErrors: number
+  failures: number
+  timeouts: number
+  unfinished: number
+  attempts: number
+  retries: number
+  shortCircuited: number
+  budgetDenied: number
+  receivedMinusSent: number
+  downstream: { received: number; served: number; errors: number; dropped: number; wasted: number; restarts: number }
+  breakerTransitions: { tMs: number; state: 'OPEN' | 'HALF_OPEN' | 'CLOSED' }[]
+  recoveryMs: number | null
+}
+
+export interface FailureDetails {
+  policy: { attemptTimeoutMs: number; maxRetries: number; backoffBaseMs: number; retryBudget: number; breaker: boolean }
+  config: {
+    fault: string
+    faultStartMs: number
+    faultEndMs: number
+    measureStartMs: number
+    measureEndMs: number
+    windowMs: number
+    rate: number
+    downstreamWorkers: number
+    downstreamLatencyMs: number
+    healthyCapacityRps: number | null
+    requestTimeoutMs: number
+    bindAddress: string
+  }
+  trials: FailureTrial[]
+}
+
 export interface LivenessWitness {
   prefix: ExplorerStep[]
   cycle: ExplorerStep[]
@@ -345,7 +398,7 @@ export interface ScenarioResult {
   trials: Trial[]
   invariant: { description: string | null; checked: number; violations: number; held: boolean | null }
   observations: string[]
-  details: { explorer?: ExplorerDetails; liveness?: LivenessDetails; jmh?: JmhDetails; httpLoad?: HttpLoadDetails; database?: DatabaseDetails; jvm?: JvmDetails; [k: string]: unknown }
+  details: { explorer?: ExplorerDetails; liveness?: LivenessDetails; failure?: FailureDetails; jmh?: JmhDetails; httpLoad?: HttpLoadDetails; database?: DatabaseDetails; jvm?: JvmDetails; [k: string]: unknown }
 }
 
 export interface Run {

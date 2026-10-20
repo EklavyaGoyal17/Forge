@@ -1,16 +1,8 @@
 import { render, screen, within } from '@testing-library/react'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { JvmView, markerWindows, rollingMedian, shortFrame, tierLabel } from '../components/JvmView'
 import type { JfrSummary, JvmDetails } from '../lib/api'
 
-beforeAll(() => {
-  // jsdom has no ResizeObserver; Recharts' ResponsiveContainer needs one to mount.
-  globalThis.ResizeObserver ??= class {
-    observe() {}
-    unobserve() {}
-    disconnect() {}
-  } as unknown as typeof ResizeObserver
-})
 
 const PKG = 'dev.forge.lab.scenarios.jvm.'
 

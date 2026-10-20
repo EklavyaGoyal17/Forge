@@ -177,7 +177,27 @@ against it with the comparison above. The gate is conservative:
   compile thresholds differ between JDK versions — compare modes on one JDK only (the version is
   part of the environment comparison).
 
-## 9. Generalisation caveats (shown next to results)
+## 9. Failure experiments (Failure Lab)
+
+* **Plan the fault, then look at the whole timeline.** A single success percentage hides when
+  failures happened. The run records, per window, success (by completion time), latency (by intended
+  send time), attempts sent to the dependency, the dependency's backlog and the breaker state, with
+  the fault window shaded.
+* **Recovery is defined, not eyeballed:** the time from the end of the fault to the first of three
+  consecutive windows with ≥ 95% success and p99 within 2× the pre-fault p99. Both thresholds are
+  conventions; the resolution is one window.
+* **Compute the headroom before reading a result.** Whether retries turn a blip into a sustained
+  outage depends on (1 + retries) × offered rate versus the dependency's healthy capacity
+  (workers ÷ latency). The observations state both numbers. The same policy that is metastable at
+  95% of capacity may recover quickly at 50%.
+* **Count what the dependency received, not only what the policy sent.** The JDK `HttpClient`
+  resends an idempotent GET by itself when a pooled connection closes before any response; the run
+  reports "received − sent" so hidden retries are visible.
+* **Compare like with like:** same fault, rate, capacity and deadline across variants. Fault timing
+  is relative to the start of each trial, and error selection is seeded, so repeated runs see the same
+  fault schedule.
+
+## 10. Generalisation caveats (shown next to results)
 
 A result holds for: this machine, this JVM, this heap size, this data size and distribution, this
 concurrency level, and this code version. Before acting on it, ask:

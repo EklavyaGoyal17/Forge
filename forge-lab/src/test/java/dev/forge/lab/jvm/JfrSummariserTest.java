@@ -41,7 +41,7 @@ class JfrSummariserTest {
         try (JfrCapture capture = JfrCapture.start(work, "test", settings)) {
             JfrMarker.mark("begin");
             allocateBuffers();
-            spin(300);
+            spinUntilSampled();
             System.gc();
             holdMonitorWhileAnotherThreadWaits();
             holdReentrantLockWhileAnotherThreadWaits();
@@ -56,6 +56,40 @@ class JfrSummariserTest {
         for (int i = 0; i < 200_000; i++) {
             sink = new byte[1024];
         }
+    }
+
+    /**
+     * The execution sampler does not always start sampling within a fixed window (seen on JDK 21 in a
+     * container: 0 samples in 300 ms), so spin until the running recording holds a sample of
+     * {@link #spin}, for at most 5 s.
+     */
+    static void spinUntilSampled() throws java.io.IOException {
+        for (int i = 0; i < 25; i++) {
+            spin(200);
+            if (spinSamples() > 0) {
+                return;
+            }
+        }
+    }
+
+    static long spinSamples() throws java.io.IOException {
+        long n = 0;
+        for (jdk.jfr.Recording r : jdk.jfr.FlightRecorder.getFlightRecorder().getRecordings()) {
+            if (r.getState() != jdk.jfr.RecordingState.RUNNING) {
+                continue;
+            }
+            Path probe = Files.createTempFile(work, "probe", ".jfr");
+            r.dump(probe);
+            for (jdk.jfr.consumer.RecordedEvent e : jdk.jfr.consumer.RecordingFile.readAllEvents(probe)) {
+                if (e.getEventType().getName().equals("jdk.ExecutionSample") && e.getStackTrace() != null
+                        && e.getStackTrace().getFrames().stream().anyMatch(f -> f.getMethod().getName().equals("spin")
+                        && f.getMethod().getType().getName().endsWith("JfrSummariserTest"))) {
+                    n++;
+                }
+            }
+            Files.deleteIfExists(probe);
+        }
+        return n;
     }
 
     static long spin(long millis) {
