@@ -38,6 +38,12 @@ services:
       FORGE_DB_PASSWORD: ${FORGE_DB_PASSWORD:-forge}
       # inside the container the server must listen on all interfaces; the host port below is loopback-only
       FORGE_BIND_ADDRESS: 0.0.0.0
+      # AI Investigator (optional). none = rule-based only; anthropic sends evidence to the Anthropic API.
+      # Runner JVMs never see these: they start with an empty environment.
+      FORGE_AI_PROVIDER: ${FORGE_AI_PROVIDER:-none}
+      FORGE_AI_MODEL: ${FORGE_AI_MODEL:-}
+      FORGE_AI_API_KEY: ${FORGE_AI_API_KEY:-${ANTHROPIC_API_KEY:-}}
+      FORGE_AI_LOCAL_URL: ${FORGE_AI_LOCAL_URL:-http://127.0.0.1:11434/v1}
     ports:
       - "127.0.0.1:8090:8090"
     # Hardening (docs/SECURITY.md §2). Runner JVMs are children of this container and inherit these limits.

@@ -5,6 +5,7 @@ import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ComparePanel } from '../components/ComparePanel'
 import { NotebookPanel } from '../components/NotebookPanel'
 import { GateBadge, RegressionPanel } from '../components/RegressionPanel'
+import { InvestigatorPanel } from '../components/InvestigatorPanel'
 import { ReviewPanel } from '../components/ReviewPanel'
 import { RunConfigForm } from '../components/RunConfigForm'
 import { RunDetail } from '../components/RunDetail'
@@ -14,7 +15,7 @@ import { ApiError, api } from '../lib/api'
 import { duration, fmt, relativeTime, runDuration } from '../lib/format'
 import { LAB_LABEL } from '../lib/labs'
 
-type Tab = 'runs' | 'compare' | 'notebook' | 'review' | 'report' | 'scenario'
+type Tab = 'runs' | 'compare' | 'investigate' | 'notebook' | 'review' | 'report' | 'scenario'
 
 export function ExperimentPage() {
   const { id = '' } = useParams()
@@ -52,6 +53,7 @@ export function ExperimentPage() {
         tabs={[
           { id: 'runs', label: `Runs (${runs.length})` },
           { id: 'compare', label: 'Compare' },
+          { id: 'investigate', label: 'Investigate' },
           { id: 'notebook', label: 'Notebook' },
           { id: 'review', label: 'Review board' },
           { id: 'report', label: 'Report' },
@@ -65,6 +67,7 @@ export function ExperimentPage() {
         <>
           {tab === 'runs' && <RunsWorkbench experiment={experiment} runs={runs} descriptor={d} sources={scenario.data!.sources} />}
           {tab === 'compare' && <Card><ComparePanel runs={runs} /></Card>}
+          {tab === 'investigate' && <InvestigatorPanel experimentId={experiment.id} runsKey={runsKey} />}
           {tab === 'notebook' && <Card><NotebookPanel experiment={experiment} /></Card>}
           {tab === 'review' && <Card><ReviewPanel experiment={experiment} runsKey={runsKey} /></Card>}
           {tab === 'report' && <ReportView experiment={experiment} runsKey={runsKey} />}

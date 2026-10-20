@@ -47,6 +47,12 @@
             <artifactId>postgresql</artifactId>
             <scope>runtime</scope>
         </dependency>
+        <!-- AI Investigator: optional Anthropic provider (off unless FORGE_AI_PROVIDER=anthropic). -->
+        <dependency>
+            <groupId>com.anthropic</groupId>
+            <artifactId>anthropic-java</artifactId>
+            <version>2.34.0</version>
+        </dependency>
 
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -234,6 +234,32 @@ now because it needs Docker access from the runner and a network path out of it 
 k6 adapter is deferred); faults inside the target give the same client-side behaviour for HTTP.
 Using Resilience4j — rejected for the lab (opaque in a teaching view); production code should use it.
 
+### ADR-014 — AI Investigator: evidence bundle, rules first, model optional and checked (implemented)
+The investigator builds an **evidence bundle** for one experiment from stored records only, each item
+with a stable citation id (`Q`, `N` for the user's notes, `S` for the scenario, `R3`, `R3.env`,
+`R3.m.<metric>`, `R3.inv`, `R3.obs`, `R3.detail`, `C1-2` comparisons, `G` regression gate, `B` review
+board). Numbers are written with at most 4 significant digits.
+
+A **rule-based analyser** (`RuleAnalyzer`) always runs: each finding is an OBSERVATION, HYPOTHESIS,
+CAVEAT or NEXT_EXPERIMENT, names its rule and cites evidence ids; explanations are only ever
+hypotheses with the measurement that would test them. Without a provider, questions are answered by
+retrieving the findings and evidence that share the most words with the question — and the answer says
+that this is retrieval, not understanding.
+
+With a provider, the model receives the same bundle and findings and is told to cite ids and keep
+observation and hypothesis apart; **every answer is checked** (`AnswerChecker`): unknown citations and
+numbers that do not appear in the evidence (after rounding to the answer's precision or within 0.5%)
+are listed under the answer. Derived numbers are flagged too, deliberately — the reader verifies them.
+
+Providers: Anthropic through the official Java SDK (`com.anthropic:anthropic-java`; default model
+`claude-opus-5-5`, effort `high`, server-side refusal fallback enabled, refusals reported as such), or a
+local OpenAI-compatible server (Ollama, llama.cpp, vLLM, LM Studio) on loopback. Questions and answers
+are stored (`investigation` table) with the evidence ids they were grounded in.
+
+Alternatives considered: tool use (letting the model query runs itself) — more flexible, but the bundle
+keeps what the model saw reviewable and identical to what the UI shows; free-form chat without a
+checker — rejected, it would make the model an oracle.
+
 ## 4. Technology choices
 
 | Choice | Why | Trade-off |
@@ -297,5 +323,4 @@ explicit and reviewable.
 | Component | Phase | Notes |
 |---|---|---|
 | k6 adapter | 2 (deferred) | Needs Docker access from the runner and a target reachable from a container; to be designed with the dedicated runner container (Phase 9). The open-model generator, embedded target and pinned-baseline regression gate are implemented. |
-| AI Investigator | 7 | Provider-agnostic adapter; prompts built only from stored artifacts, with citations to run ids. |
 | Challenge Arena | 8 | Challenges = scenario + verification predicate over recorded results. |

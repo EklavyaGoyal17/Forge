@@ -89,6 +89,24 @@ FORGE's plausibility check flags this. Explorer mode, by contrast, deterministic
 **64 of 70** schedules violating the invariant for 2 threads × 2 deposits. Your numbers will differ;
 that is the point.
 
+## AI Investigator (optional model)
+
+The investigator always works without a model: its findings come from explicit rules over stored
+evidence. To also ask a model questions about an experiment, set one of these before starting FORGE:
+
+```bash
+FORGE_AI_PROVIDER=anthropic FORGE_AI_API_KEY=sk-ant-... docker compose up -d
+```
+
+```bash
+FORGE_AI_PROVIDER=local FORGE_AI_LOCAL_URL=http://127.0.0.1:11434/v1 FORGE_AI_MODEL=llama3.1 mvn -pl forge-server spring-boot:run
+```
+
+`anthropic` sends the experiment's evidence (as shown in the UI) to the Anthropic API and is billed to
+your key; the default model is `claude-opus-5-5` (`FORGE_AI_MODEL` overrides it). `local` must point at
+a loopback address. Answers are checked against the evidence: citations must exist, and numbers that do
+not appear in the evidence are flagged. See docs/SECURITY.md → "AI Investigator data flow".
+
 ## Architecture in one paragraph
 
 A Spring Boot 4 server (Java 21 bytecode) stores experiments and runs in PostgreSQL. A single

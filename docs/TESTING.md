@@ -125,6 +125,21 @@ regression even when the metric improved; secondary regressions are listed but d
   retry budget caps retries and refuses some; plans that could exhaust local ports or whose fault
   outlives the sustained phase are rejected. Recovery times and latencies are not asserted.
 
+### AI Investigator (`forge-server/.../investigator/InvestigatorUnitTest`, `InvestigatorIntegrationTest`)
+* Answer checking: unknown citations are reported; a number equal to evidence, equal after rounding
+  to the answer's precision, or within 0.5% is supported; a derived ratio and an invented number are
+  both flagged; small whole numbers and numbers inside citations are not checked.
+* The no-provider answer says it is retrieval, includes related findings and evidence, and leaves out
+  unrelated ones; citations of evidence that does not exist are dropped from findings.
+* The local provider speaks OpenAI-compatible chat completions (path, roles, content, usage) against a
+  stub; non-loopback local URLs and an Anthropic provider without a key are rejected at start-up.
+* End to end on PostgreSQL 17: two real runs → evidence bundle with the expected ids → rule-based
+  findings whose citations all resolve → a question answered through the **official Anthropic SDK
+  pointed at a local stub** of the Messages API (no key, no network, no cost) → the request carries the
+  model, `x-api-key`, effort `high`, the refusal-fallback beta header and `fallbacks: "default"`, the
+  system prompt and the evidence → the stored answer lists the stub's invented number and unknown
+  citation. The real Anthropic API is not called by any test.
+
 ### Runner protocol (`forge-lab/.../runner/RunnerProcessTest`)
 Launches `RunnerMain` as a real child process: a valid spec produces a result with environment
 and JVM flags; invalid parameters, unknown scenarios and non-JSON input exit with code 2 without
@@ -161,6 +176,9 @@ bug: the first container build served `index.html` but 404'd every asset.)
   "holds" only for complete graphs, exploration errors shown instead of verdicts.
 * Failure timeline: breaker-open ranges, per-second rates, success / recovery / sustained-phase
   attempts per request, trial switching, "no recovery" and control-run states.
+* Investigator panel: findings grouped by kind, the off-host warning before asking, the answer check
+  (unknown citations struck through, unverified numbers listed), opening cited evidence, asking a
+  question and showing the stored rule-based answer.
 * Run configuration form: variants disabled outside their supported modes, mode-specific parameters, client-side bounds mirroring the server,
   variant source display, submission payload, explore mode forcing a single trial.
 

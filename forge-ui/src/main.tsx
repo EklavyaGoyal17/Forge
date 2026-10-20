@@ -8,6 +8,7 @@ import { MODULES } from './lib/labs'
 import { Dashboard } from './pages/Dashboard'
 import { ExperimentPage } from './pages/ExperimentPage'
 import { ExperimentsPage, NewExperimentPage } from './pages/Experiments'
+import { InvestigatorPage } from './pages/Investigator'
 import { LabPage } from './pages/LabPage'
 import { NotebookPage } from './pages/Notebook'
 import { PlannedModule } from './pages/PlannedModule'
@@ -34,7 +35,7 @@ const router = createBrowserRouter([
       { path: 'labs/database', element: <LabPage lab="DATABASE" /> },
       { path: 'labs/failure', element: <LabPage lab="FAILURE" /> },
       { path: 'challenges', element: <PlannedModule module={module('/challenges')} /> },
-      { path: 'investigator', element: <PlannedModule module={module('/investigator')} /> },
+      { path: 'investigator', element: <InvestigatorPage /> },
       { path: 'notebook', element: <NotebookPage /> },
       { path: '*', element: <div className="p-6 text-dim">Page not found.</div> },
     ],

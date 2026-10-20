@@ -12,7 +12,7 @@ or a recorded manual check. Status values: `done`, `in progress`, `not started`.
 | 4 | Database studio | done |
 | 5 | JVM lab | done |
 | 6 | Failure lab | done |
-| 7 | AI investigator | not started |
+| 7 | AI investigator | done (no real-API call verified; see below) |
 | 8 | Challenge arena | not started |
 | 9 | Hardening | not started |
 
@@ -77,8 +77,10 @@ Recorded end-to-end check (2026-10-19, development machine: i7-12650H, 16 logica
 - [x] Found while testing: the JDK `HttpClient` resends an idempotent GET by itself when a pooled connection closes before any response. Runs report "received − sent" so retries below the policy's own logic are visible.
 
 ## Phase 7 — AI investigator
-- [ ] Provider-agnostic adapter (API + local model); evidence bundle built only from stored artifacts.
-- [ ] Rule-based analyser that works with no AI provider configured.
+- [x] Evidence bundle built only from stored records, every item citable (ADR-014). *(`InvestigatorIntegrationTest` checks the ids for real runs)*
+- [x] Rule-based analyser that works with no AI provider configured: observations, hypotheses (never stated as fact), caveats and suggested experiments, each naming its rule and citing evidence. *(citations resolve in the integration test; rules include noisy metric, small sample, invariant violated, correctness first, heavy tail, saturation and Little's-law bound, no recovery / metastability, amplification, livelock, incomplete graph, explorer not exhaustive, stress is not proof, comparison verdicts, environment confound, multiple changes, and next experiments)*
+- [x] Provider-agnostic adapter: Anthropic (official Java SDK, `claude-opus-5-5`, refusal fallback) and a local OpenAI-compatible server on loopback; configured from the environment only. *(contract-tested against local stubs; **no request to the real Anthropic API has been made** — that needs your API key and is billed)*
+- [x] Every model answer is checked against the evidence (unknown citations, numbers not in the evidence) and stored with the evidence ids it used.
 
 ## Phase 8 — Challenge arena
 - [ ] Challenges defined as scenario + verification predicate; completion only by measured criteria.

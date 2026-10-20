@@ -52,5 +52,17 @@ forge:
     connection-limit: 16
     statement-timeout-seconds: 60
     lock-timeout-seconds: 10
+  # AI Investigator. Off by default: the rule-based analysis needs no provider. Configured from the
+  # environment only; the key is never returned by any endpoint or stored.
+  #   anthropic: evidence is sent to the Anthropic API (FORGE_AI_API_KEY or ANTHROPIC_API_KEY)
+  #   local:     an OpenAI-compatible model server on loopback (Ollama, llama.cpp, vLLM, LM Studio)
+  ai:
+    provider: ${FORGE_AI_PROVIDER:none}
+    model: ${FORGE_AI_MODEL:}
+    api-key: ${FORGE_AI_API_KEY:${ANTHROPIC_API_KEY:}}
+    local-url: ${FORGE_AI_LOCAL_URL:http://127.0.0.1:11434/v1}
+    base-url: ${FORGE_AI_BASE_URL:}
+    max-output-tokens: 16000
+    timeout-seconds: 300
 
 # Structured (JSON) logs: set LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs (or logstash).

@@ -58,6 +58,25 @@ network interface.
   attempts (rate × duration × (1 + retries) × trials), because each timed-out attempt closes a TCP
   connection and consumes a local port for the TIME_WAIT period.
 
+### AI Investigator data flow
+* **Off by default.** With `FORGE_AI_PROVIDER=none` nothing is sent anywhere; the rule-based analysis
+  runs in the server.
+* **Configured from the server environment only.** No endpoint accepts a provider, URL, model or key,
+  so a request cannot redirect evidence or read the key; `/api/investigator/status` reports the provider
+  and model, never the key. The key is not stored in the database or logged. Runner JVMs start with an
+  empty environment, so scenarios never see it.
+* **What is sent** (provider `anthropic`): the experiment's evidence bundle exactly as the UI shows it —
+  question, hypothesis, the user's notebook text, scenario caveats, run parameters, environment
+  summaries (CPU model, OS, JVM), metric summaries, observations and comparison results — plus the
+  question. No source code, artifacts or raw trial data beyond that. The UI states this next to the Ask
+  button. Treat the notebook as content that leaves the machine when this provider is enabled.
+* **Local provider** (`local`): the base URL must be a loopback address (checked at start-up), so
+  evidence stays on the host.
+* **Prompt injection.** Evidence includes user-written text (notes, labels). The system prompt tells
+  the model to treat evidence as data, and every answer is checked: citations must resolve to evidence
+  ids and numbers that are not in the evidence are flagged. Model output is rendered as text, never as
+  HTML, and is never executed or used to start runs.
+
 ### Container deployment (`docker-compose.yml`)
 * Server image runs as a non-root user.
 * `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, `read_only: true` root filesystem

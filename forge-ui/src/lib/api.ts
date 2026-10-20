@@ -611,6 +611,26 @@ export interface CreateRunRequest {
   timeoutSeconds?: number
 }
 
+// ---- AI Investigator ----
+
+export interface InvestigatorStatus { provider: 'none' | 'anthropic' | 'local'; model: string | null; enabled: boolean; sendsEvidenceOffHost: boolean; description: string }
+export interface EvidenceItem { id: string; kind: string; title: string; runSeq: number | null; text: string }
+export type FindingKind = 'OBSERVATION' | 'HYPOTHESIS' | 'CAVEAT' | 'NEXT_EXPERIMENT'
+export interface Finding { kind: FindingKind; rule: string; text: string; citations: string[] }
+export interface InvestigationAnalysis { experimentId: string; provider: InvestigatorStatus; evidence: EvidenceItem[]; findings: Finding[] }
+export interface Investigation {
+  id: string
+  experimentId: string
+  question: string
+  provider: string
+  model: string | null
+  answer: string
+  citations: string[]
+  check: { unknownCitations: string[]; unverifiedNumbers: string[]; checkedNumbers: number; uncited?: boolean; stopReason?: string | null; note?: string; inputTokens?: number | null; outputTokens?: number | null }
+  evidenceIds: string[]
+  createdAt: string
+}
+
 export const api = {
   system: () => request<SystemView>('GET', '/system'),
   scenarios: () => request<ScenarioDescriptor[]>('GET', '/scenarios'),
@@ -640,4 +660,8 @@ export const api = {
   unpinBaseline: (id: string) => request<Experiment>('DELETE', `/experiments/${id}/pinned-baseline`),
   regressions: (id: string) => request<RegressionReport>('GET', `/experiments/${id}/regressions`),
   report: (id: string) => request<string>('GET', `/experiments/${id}/report.md`),
+  investigatorStatus: () => request<InvestigatorStatus>('GET', '/investigator/status'),
+  investigation: (id: string) => request<InvestigationAnalysis>('GET', `/experiments/${id}/investigation`),
+  investigations: (id: string) => request<Investigation[]>('GET', `/experiments/${id}/investigation/questions`),
+  ask: (id: string, question: string) => request<Investigation>('POST', `/experiments/${id}/investigation/questions`, { question }),
 }
