@@ -36,6 +36,9 @@ import java.util.function.Consumer;
  */
 public final class ControlledExecution {
 
+    /** Returned by {@link Chooser#choose(DecisionPoint)} to end the execution here (outcome {@code STOPPED}). */
+    public static final int STOP = -1;
+
     /** Picks which enabled worker runs next. */
     @FunctionalInterface
     public interface Chooser {
@@ -44,12 +47,37 @@ public final class ControlledExecution {
          * @return a position in {@code enabled}
          */
         int choose(List<Integer> enabled);
+
+        /** Full-information variant; may return {@link #STOP}. Defaults to {@link #choose(List)}. */
+        default int choose(DecisionPoint point) {
+            return choose(point.enabled());
+        }
+
+        /**
+         * Called with every scheduler state while all workers are parked, including the final one
+         * (all finished, or deadlocked) — before {@link #choose(DecisionPoint)} when a choice follows.
+         */
+        default void observe(DecisionPoint point) {
+        }
+    }
+
+    /**
+     * The scheduler's view while every live worker is parked at a yield point.
+     *
+     * @param depth       number of steps executed so far
+     * @param enabled     indices of workers that may run next, ascending
+     * @param pending     each worker's next action ({@code null} once it has finished)
+     * @param progress    how often each worker has called {@link Probe#progress(String)}
+     * @param lockHolders lock name → index of the worker holding it, for held locks
+     */
+    public record DecisionPoint(int depth, List<Integer> enabled, List<String> pending, List<Integer> progress,
+                                Map<String, Integer> lockHolders) {
     }
 
     public record NamedTask(String name, Consumer<Probe> body) {
     }
 
-    public enum Outcome { COMPLETED, DEADLOCK, STEP_LIMIT, ERROR }
+    public enum Outcome { COMPLETED, DEADLOCK, STEP_LIMIT, ERROR, STOPPED }
 
     public record Step(int index, String thread, String kind, String target, String detail, String outcome) {
     }
@@ -117,14 +145,16 @@ public final class ControlledExecution {
                     return abort(Outcome.ERROR, List.of(), failed.name + " threw " + failed.failure);
                 }
                 List<Worker> live = workers.stream().filter(w -> !w.finished).toList();
-                if (live.isEmpty()) {
-                    return finish(Outcome.COMPLETED, List.of(), null);
-                }
                 List<Integer> enabled = new ArrayList<>();
                 for (Worker w : live) {
                     if (isEnabled(w)) {
                         enabled.add(w.index);
                     }
+                }
+                DecisionPoint point = point(enabled);
+                chooser.observe(point);
+                if (live.isEmpty()) {
+                    return finish(Outcome.COMPLETED, List.of(), null);
                 }
                 if (enabled.isEmpty()) {
                     return abort(Outcome.DEADLOCK, describeWaits(live), null);
@@ -132,7 +162,10 @@ public final class ControlledExecution {
                 if (steps.size() >= maxSteps) {
                     return abort(Outcome.STEP_LIMIT, List.of(), "step bound " + maxSteps + " reached");
                 }
-                int pos = chooser.choose(List.copyOf(enabled));
+                int pos = chooser.choose(point);
+                if (pos == STOP) {
+                    return abort(Outcome.STOPPED, List.of(), null);
+                }
                 if (pos < 0 || pos >= enabled.size()) {
                     throw new IllegalStateException("chooser returned invalid position " + pos);
                 }
@@ -148,6 +181,24 @@ public final class ControlledExecution {
             Thread.currentThread().interrupt();
             return abort(Outcome.ERROR, List.of(), "driver interrupted");
         }
+    }
+
+    private DecisionPoint point(List<Integer> enabled) {
+        List<String> pending = new ArrayList<>(workers.size());
+        List<Integer> progress = new ArrayList<>(workers.size());
+        for (Worker w : workers) {
+            PendingAction a = w.pending;
+            pending.add(w.finished || a == null ? null : a.detail);
+            progress.add(w.progress);
+        }
+        Map<String, Integer> holders = new java.util.TreeMap<>();
+        locks.forEach((name, s) -> {
+            if (s.holder != null) {
+                holders.put(name, s.holder.index);
+            }
+        });
+        return new DecisionPoint(steps.size(), List.copyOf(enabled), java.util.Collections.unmodifiableList(pending),
+                List.copyOf(progress), java.util.Collections.unmodifiableMap(holders));
     }
 
     private boolean isEnabled(Worker w) {
@@ -299,6 +350,13 @@ public final class ControlledExecution {
         @Override public void tryAcquire(String lock) { yieldPoint("TRY_ACQUIRE", lock, "tryLock " + lock); }
         @Override public void acquired(boolean success) { annotate(success ? "acquired" : "not acquired"); }
         @Override public void release(String lock) { yieldPoint("RELEASE", lock, "unlock " + lock); }
+        @Override public void progress(String what) {
+            Worker w = current.get();
+            if (w != null) {
+                w.progress++;
+                annotate("progress: " + what);
+            }
+        }
     }
 
     private static final class Worker {
@@ -310,6 +368,7 @@ public final class ControlledExecution {
         volatile boolean finished;
         volatile Throwable failure;
         volatile MutableStep lastStep;
+        volatile int progress;
 
         Worker(int index, String name) {
             this.index = index;

@@ -9,6 +9,7 @@ import { DatabaseView } from './DatabaseView'
 import { ExplorerView } from './ExplorerView'
 import { HttpLoadView } from './HttpLoadView'
 import { JvmView } from './JvmView'
+import { LivenessView } from './LivenessView'
 import { Badge, Button, InvariantBadge, Stat, StatusPill, Tabs, cx } from './ui'
 
 type Tab = 'results' | 'timeline' | 'artifacts' | 'environment' | 'config'
@@ -122,6 +123,7 @@ function Results({ view, descriptor }: { view: RunView; descriptor: ScenarioDesc
   const chosen = metric && view.summaries[metric] ? metric : primary
   const spec: MetricSpec | undefined = descriptor.metrics.find((m) => m.name === chosen)
   const explorer = result.details.explorer
+  const liveness = result.details.liveness
   const jmh = result.details.jmh
   const httpLoad = result.details.httpLoad
   const database = result.details.database
@@ -147,13 +149,15 @@ function Results({ view, descriptor }: { view: RunView; descriptor: ScenarioDesc
 
       {explorer && <ExplorerView details={explorer} />}
 
+      {liveness && <LivenessView details={liveness} />}
+
       {httpLoad && <HttpLoadView details={httpLoad} />}
 
       {database && <DatabaseView details={database} />}
 
       {jvm && <JvmView details={jvm} />}
 
-      {!explorer && chosen && (
+      {!explorer && !liveness && chosen && (
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <label htmlFor="metric" className="text-[12px] text-muted">Metric</label>

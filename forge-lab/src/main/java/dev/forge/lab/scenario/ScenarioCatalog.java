@@ -7,7 +7,9 @@ import dev.forge.lab.scenarios.database.IndexLookupScenario;
 import dev.forge.lab.scenarios.database.NPlusOneScenario;
 import dev.forge.lab.scenarios.database.PaginationScenario;
 import dev.forge.lab.scenarios.database.SqlLostUpdateScenario;
+import dev.forge.lab.scenarios.concurrency.LivelockScenario;
 import dev.forge.lab.scenarios.concurrency.LostUpdateScenario;
+import dev.forge.lab.scenarios.concurrency.StarvationScenario;
 import dev.forge.lab.scenarios.concurrency.VisibilityScenario;
 import dev.forge.lab.scenarios.jvm.AllocationScenario;
 import dev.forge.lab.scenarios.jvm.LockContentionScenario;
@@ -32,6 +34,8 @@ public final class ScenarioCatalog {
         register(new DeadlockScenario());
         register(new VisibilityScenario());
         register(new BackpressureScenario());
+        register(new LivelockScenario());
+        register(new StarvationScenario());
         register(new LookupScenario());
         register(new ThreadPoolStarvationScenario());
         register(new IndexLookupScenario());

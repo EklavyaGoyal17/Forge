@@ -98,6 +98,11 @@ against it with the comparison above. The gate is conservative:
   sequential consistency. It can prove that *at that granularity* no schedule violates the
   invariant, which is a much stronger statement than stress testing, but still not a proof about
   the JVM.
+* Liveness (livelock, starvation) cannot be decided by running something "for a while". FORGE's
+  liveness mode searches the complete state graph for a **weakly fair** cycle without progress
+  (ADR-012). A found cycle is a concrete schedule that can repeat forever; "no starvation" is only
+  claimed when the graph is complete. Stress mode for these scenarios reports wait times, which say
+  how likely starvation was on this machine, not whether it is possible.
 
 ## 6. Load tests (Performance Lab)
 

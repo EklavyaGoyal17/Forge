@@ -118,6 +118,34 @@ export interface ExplorerTrace {
   steps: ExplorerStep[]
 }
 
+export interface LivenessWitness {
+  prefix: ExplorerStep[]
+  cycle: ExplorerStep[]
+  prefixLength: number
+  cycleLength: number
+}
+
+/** Explicit-state liveness exploration (LivenessExplorer): state graph, safety, livelock and starvation cycles. */
+export interface LivenessDetails {
+  threads: string[]
+  states: number
+  edges: number
+  executions: number
+  complete: boolean
+  maxStates: number
+  safetyViolations: number
+  firstSafetyViolation: string | null
+  safetyTrace: ExplorerStep[] | null
+  deadlocks: number
+  deadlockTrace: ExplorerStep[] | null
+  livelock: LivenessWitness | null
+  starvation: Record<string, LivenessWitness>
+  error: string | null
+  elapsedMs: number
+  fairness: string
+  granularity: string
+}
+
 export interface ExplorerDetails {
   schedulesExplored: number
   exhaustive: boolean
@@ -317,7 +345,7 @@ export interface ScenarioResult {
   trials: Trial[]
   invariant: { description: string | null; checked: number; violations: number; held: boolean | null }
   observations: string[]
-  details: { explorer?: ExplorerDetails; jmh?: JmhDetails; httpLoad?: HttpLoadDetails; database?: DatabaseDetails; jvm?: JvmDetails; [k: string]: unknown }
+  details: { explorer?: ExplorerDetails; liveness?: LivenessDetails; jmh?: JmhDetails; httpLoad?: HttpLoadDetails; database?: DatabaseDetails; jvm?: JvmDetails; [k: string]: unknown }
 }
 
 export interface Run {

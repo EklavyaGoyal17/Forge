@@ -47,6 +47,12 @@ public interface Probe {
     /** Before releasing a lock (monitor exit or {@code Lock.unlock()}). */
     void release(String lock);
 
+    /**
+     * Marks that the calling thread just made progress (e.g. entered its critical section). Does not
+     * yield; liveness checking ({@link LivenessExplorer}) uses it to tell progress from spinning.
+     */
+    void progress(String what);
+
     Probe NONE = new Probe() {
         @Override public void read(String target) { }
         @Override public void value(long observed) { }
@@ -58,5 +64,6 @@ public interface Probe {
         @Override public void tryAcquire(String lock) { }
         @Override public void acquired(boolean success) { }
         @Override public void release(String lock) { }
+        @Override public void progress(String what) { }
     };
 }

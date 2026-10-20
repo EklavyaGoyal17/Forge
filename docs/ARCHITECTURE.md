@@ -97,6 +97,8 @@
   schedule. It is *deterministic* but only as precise as its yield points, and it assumes
   sequential consistency — it does **not** model Java Memory Model reorderings or
   visibility failures (those are demonstrated in stress mode instead).
+* **Liveness mode** (livelock and starvation scenarios, ADR-012) builds the explicit state graph of
+  threads that loop forever and searches it for fair cycles without progress.
 * Neither technique proves the absence of concurrency bugs. Both say so in the UI.
 
 ### ADR-007 — JMH for microbenchmarks
@@ -183,6 +185,36 @@
 * **Cost:** JFR adds its own (small) overhead to the measured trials, and parsing takes 50–500 ms
   per run after the measurement (≈ 0.5 s under `-Xint`). Both are outside the timed regions.
 
+### ADR-012 — Liveness: explicit state graph and fair cycles, not a step bound (implemented)
+Livelock and starvation are properties of *infinite* executions. The interleaving explorer can only
+report "this schedule exceeded the step bound", which cannot distinguish a real livelock from an
+unfair scheduler that never ran the thread that would have made progress.
+
+`LivenessExplorer` therefore builds the reachable **state graph** of a small program whose threads
+loop forever. A state is the scenario's snapshot of shared memory (plus thread-local values that
+matter, which scenarios keep in their state object) + each thread's next action + lock holders.
+Each execution replays a known path from the initial state on fresh threads (stateless replay, as
+in ADR-006) and extends the graph with untried steps until it reaches a state whose steps are all
+known; a FIFO frontier keeps replay paths short. Threads mark progress with `Probe.progress()`.
+
+* **Livelock** = a reachable cycle with no progress by anyone; **starvation of T** = a cycle in which
+  T makes no progress. Cycles are found as strongly connected components (iterative Tarjan) of the
+  graph restricted to the relevant edges.
+* Only **weakly fair** cycles count: every running thread takes a step in the cycle or is blocked
+  somewhere in it. A cycle in which an enabled thread never runs is reported as nothing.
+* Soundness: every edge of a witness was executed, so a reported cycle is a real schedule even when
+  the state budget ran out. "Holds" is claimed only for a complete graph.
+* If replaying a known path reaches a different state, the program is not a function of its
+  schedule (e.g. it reads a clock or a random source) and the run fails with that error instead of
+  a verdict. A unit test covers this.
+* Limits: same granularity and sequential-consistency assumptions as ADR-006; the state snapshot
+  must capture everything that influences a thread's future (scenarios are written so that it does:
+  ticket counters are compared modulo a power of two, and the CAS-based variant keeps its counter
+  in range, so abstract states are exact).
+
+Alternative considered: bounded DFS with a step limit and a "looks periodic" heuristic. Rejected —
+it cannot separate unfair schedules from livelocks and gives no completeness claim.
+
 ## 4. Technology choices
 
 | Choice | Why | Trade-off |
@@ -246,6 +278,6 @@ explicit and reviewable.
 | Component | Phase | Notes |
 |---|---|---|
 | k6 adapter | 2 (deferred) | Needs Docker access from the runner and a target reachable from a container; to be designed with the dedicated runner container (Phase 9). The open-model generator, embedded target and pinned-baseline regression gate are implemented. |
-| Failure Lab | 6 | Fault-injecting proxy in front of embedded downstream services. |
+| Failure Lab | 6 | Fault injection inside an embedded downstream service; client resilience policies. |
 | AI Investigator | 7 | Provider-agnostic adapter; prompts built only from stored artifacts, with citations to run ids. |
 | Challenge Arena | 8 | Challenges = scenario + verification predicate over recorded results. |

@@ -8,7 +8,7 @@ or a recorded manual check. Status values: `done`, `in progress`, `not started`.
 | 0 | Architecture & documentation | done |
 | 1 | Working experiment platform | done (CI workflow not yet executed on GitHub) |
 | 2 | Performance lab (HTTP) | done except the k6 adapter (deferred by design, see below) |
-| 3 | Concurrency lab | in progress (core exercises done) |
+| 3 | Concurrency lab | done |
 | 4 | Database studio | done |
 | 5 | JVM lab | done |
 | 6 | Failure lab | not started |
@@ -50,7 +50,10 @@ fully verified; `[ ]` = not done.
 - [x] Visibility: plain vs volatile stop flag.
 - [x] Every scenario: invariant, broken + fixed implementation, automated verification, explanation.
 - [x] Bounded queue / backpressure: unbounded vs blocking vs load shedding under open-loop overload (latency from intended time), plus a check-then-act bounded-buffer race with explorer counterexample.
-- [ ] Starvation and an explicit livelock exercise. *(livelock is already observable: the tryLock explorer reports schedules that exceed the step bound)*
+- [x] Livelock exercise. *(`concurrency.livelock`: polite flags vs randomised back-off vs Peterson's algorithm. `LivenessExplorer` (ADR-012) builds the complete state graph of both threads looping forever: polite flags keep mutual exclusion but have a fair cycle without progress; Peterson is livelock- and starvation-free on the complete graph — `LivenessScenariosTest`)*
+- [x] Starvation exercise. *(`concurrency.starvation`: readers-preference, writer-preference, FIFO ticket, CAS-loop ticket, JDK `ReentrantReadWriteLock` non-fair/fair. Explorer: readers-preference can starve the writer, writer-preference the readers, the CAS-loop ticket a thread whose CAS keeps losing (lock-free is not wait-free — FORGE's first ticket lock had this bug and the explorer found it); the fetch-and-add ticket lock starves nobody. Stress: writer wait p99/max with censored waits, read throughput and peak concurrent readers)*
+- [x] Recorded check (2026-10-21, Docker container, 4 CPUs, default parameters): polite flags — 21 states, a 9-step fair livelock cycle reachable after 4 steps; Peterson — 48 states, complete, no livelock or starvation. Starvation explorer: readers-preference 94 states, writer-preference 237, ticket 244 (no starvation), CAS-loop ticket 2,168 (every thread can starve). Stress (3 readers, a write every 5 ms, 1 s trials): readers-preference completed 0 of 1 requested writes in 5 of 5 trials (the request was still waiting after ≈ 995 ms); every other lock completed 199 of 199 with writer wait p99 0.11–0.14 ms; the ticket lock read 46.9 k/s with 1 reader inside at a time vs 140–145 k/s and 3 concurrent readers for the sharing locks (JDK fair: 110 k/s). Livelock stress never livelocked on real cores (polite flags: longest wait 0.29 ms, 2.16 back-offs per entry).
+- [x] Liveness explorer unit tests on hand-drawn state graphs: exact state/edge counts, a one-step livelock cycle, an unfair cycle that is correctly *not* a livelock, barging-lock starvation, safety in every reachable state, and refusal to judge a program that is not a function of its schedule (`LivenessExplorerTest`).
 
 ## Phase 4 — Database studio
 - [x] Disposable lab database and restricted role; seeded synthetic transaction history. *(`LabDatabaseServiceTest` against PostgreSQL 17: the role works in its own database but cannot connect to the platform database or create databases/roles, has its statement/lock timeouts, and a restart rotates its password and sweeps leftover run schemas. Each run seeds its own schema from `dataSeed` and drops it)*

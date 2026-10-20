@@ -29,6 +29,16 @@ Deterministic tests with exact expected counts derived by hand:
 * Opposite lock order → deadlock detected with the exact wait-for cycle.
 * Random sampling is reproducible for a seed; the step bound stops non-terminating schedules.
 
+### Liveness explorer (`forge-lab/.../concurrency/LivenessExplorerTest`)
+Programs whose state graphs can be drawn by hand:
+* A loop `x=1; progress; x=0` → exactly 2 states, 2 edges, no livelock.
+* A thread spinning without progress → 1 state, a 1-step livelock cycle, starvation of that thread.
+* A thread spinning until another thread writes a flag → the spin cycle is *unfair* (the writer is
+  enabled but never scheduled) and is correctly not reported.
+* Two threads on one non-fair lock → starvation of each (barging), no livelock, no deadlock.
+* Safety is checked in every reachable state (exactly one state has both threads inside).
+* A program that is not a function of its schedule is reported as an error, not judged.
+
 ### Scenarios (`forge-lab/.../scenarios/*Test`)
 * Every *correct* variant holds its invariant under real stress (a deterministic property of correct code).
 * Every *broken* variant is shown broken through **explorer mode only** (deterministic). Broken
@@ -40,6 +50,11 @@ Deterministic tests with exact expected counts derived by hand:
   4× overload; blocking drops nothing while shedding drops work; the check-then-act buffer overfills
   in the explorer (exhaustive) while the locked one never does; variants built on uninstrumented
   `java.util.concurrent` queues are rejected in explorer mode.
+* Livelock/starvation (`LivenessScenariosTest`): verdicts asserted from complete state graphs only —
+  polite flags livelock with mutual exclusion intact; Peterson livelock- and starvation-free;
+  readers-preference starves the writer, writer-preference the readers, the CAS-loop ticket lock a
+  thread; the fetch-and-add ticket lock nobody. Stress assertions are limited to safety, progress of
+  correct variants, and the ticket lock serialising readers.
 * JMH integration: the lookup benchmark's four variants agree on the hit count for the same data,
   and a real (tiny) JMH run yields one trial per measurement iteration.
 * Catalog: every variant's displayed source resolves from the packaged source and contains the
@@ -127,6 +142,8 @@ bug: the first container build served `index.html` but 404'd every asset.)
 * Formatting of numbers, units, durations and relative time.
 * Lost-update conflict detection used to highlight trace rows (including failed vs successful CAS).
 * Trace rendering of a deadlock with its wait-for cycle.
+* Liveness verdicts and witnesses: livelock cycle with one column per thread, prefix toggle,
+  "holds" only for complete graphs, exploration errors shown instead of verdicts.
 * Run configuration form: variants disabled outside their supported modes, mode-specific parameters, client-side bounds mirroring the server,
   variant source display, submission payload, explore mode forcing a single trial.
 
