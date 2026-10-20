@@ -1,13 +1,14 @@
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 /**
  * WCAG 2.1 contrast of the design tokens, computed from index.css for both themes. Every token used
  * for text must reach 4.5:1 (AA, normal text) on every surface, and button text on the accent colour
- * too. jsdom cannot measure rendered contrast, so the tokens are checked directly.
+ * too. jsdom cannot measure rendered contrast, so the tokens are checked directly. (The file is read
+ * from disk: Vitest replaces CSS imports, including ?raw, with an empty module.)
  */
-const css = readFileSync(resolve(__dirname, '../index.css'), 'utf8')
+const css = readFileSync(join(process.cwd(), 'src', 'index.css'), 'utf8')   // vitest runs from forge-ui/
 
 function tokens(selector: string): Record<string, string> {
   const start = css.indexOf(selector)
