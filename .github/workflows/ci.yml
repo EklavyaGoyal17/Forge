@@ -47,11 +47,34 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  image:
-    name: Container image builds
+  e2e:
+    name: Hardened container, end to end
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     needs: [backend, frontend]
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -f docker/server.Dockerfile -t forge:ci .
+      - name: Build and start the compose stack (waits for health checks)
+        run: docker compose up -d --build --wait --wait-timeout 300
+      - name: Verify the container's isolation settings at runtime
+        run: |
+          set -eu
+          c=$(docker compose ps -q server)
+          test "$(docker inspect -f '{{.HostConfig.ReadonlyRootfs}}' "$c")" = true
+          test "$(docker inspect -f '{{.HostConfig.Privileged}}' "$c")" = false
+          docker inspect -f '{{json .HostConfig.CapDrop}}' "$c" | grep -q '"ALL"'
+          docker inspect -f '{{json .HostConfig.SecurityOpt}}' "$c" | grep -q 'no-new-privileges:true'
+          test "$(docker inspect -f '{{.Config.User}}' "$c")" = forge
+          docker compose exec -T server sh -c '
+            grep -E "^(Seccomp|NoNewPrivs|CapEff|CapBnd):" /proc/1/status
+            test "$(id -u)" != 0
+            grep -Eq "^Seccomp:[[:space:]]+2$" /proc/1/status
+            grep -Eq "^NoNewPrivs:[[:space:]]+1$" /proc/1/status
+            grep -Eq "^CapEff:[[:space:]]+0+$" /proc/1/status
+            ! touch /app/should-fail 2>/dev/null'
+      - name: Every scenario through the API, the UI, investigator and challenges
+        run: python3 scripts/e2e_smoke.py http://127.0.0.1:8090
+      - if: failure()
+        run: docker compose logs --no-color | tail -400
+      - if: always()
+        run: docker compose down -v
