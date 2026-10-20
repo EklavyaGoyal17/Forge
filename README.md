@@ -14,22 +14,30 @@ there are no placeholder charts.
 
 ## What works today
 
-| Area | Status |
+[![ci](https://github.com/EklavyaGoyal17/Forge/actions/workflows/ci.yml/badge.svg)](https://github.com/EklavyaGoyal17/Forge/actions/workflows/ci.yml)
+
+| Area | What it is |
 |---|---|
-| Experiment platform: experiments, runs, lifecycle, results, events, artifacts (PostgreSQL + Flyway) | ✅ |
-| Isolated runner: child JVM per run, heap cap, empty environment, private temp dir, timeout, output caps, process-tree kill | ✅ |
-| Durable run queue (DB rows claimed with `FOR UPDATE SKIP LOCKED`), serial by default, cancel | ✅ |
-| Baseline vs candidate comparison: bootstrap CI of ratio of medians, Mann–Whitney U, parameter/environment diffs | ✅ |
-| Regression gate: pin a baseline run; every other run is checked against it (and refused a verdict when not comparable) | ✅ |
-| Engineering Review Board: explicit evidence rubric + reviewer questions | ✅ |
-| Markdown report export (PDF via browser print) | ✅ |
-| **Concurrency Lab** — lost update (6 variants), deadlock (3), visibility (3), backpressure under overload (5); stress mode + deterministic interleaving explorer | ✅ |
-| **Algorithm Lab** — membership lookup (4 variants) measured with JMH | ✅ |
-| **Database Studio** — disposable PostgreSQL lab database with a restricted role; seeded transaction history per run; index on/off, OFFSET vs keyset pagination, N+1, and SQL lost updates under isolation levels and row locks; EXPLAIN (ANALYZE, BUFFERS) plan trees | ✅ |
-| **Performance Lab** — thread-pool starvation: an embedded loopback HTTP service (small blocking pool, 8× pool, non-blocking downstream, virtual threads) under an open-model load; client latency from the intended send time (coordinated-omission corrected, HdrHistogram), server service time and queue wait, Little's-law capacity | ✅ |
-| **JVM Lab** — Java Flight Recorder recorded inside the runner JVM and summarised there (hot methods with interpreted/compiled frames, allocation by class and site, GC pauses, contended monitors and parked locks); JIT warm-up from the first call in tiered / C1-only / C2-only / interpreter modes with each compilation placed on the invocation axis; allocation-heavy vs allocation-light implementations with exact per-thread allocation counts; lock contention (synchronized vs ReentrantLock vs per-thread state) | ✅ |
-| Web UI: dashboard, experiment workspace, run evidence, compare, notebook, review, command palette, keyboard shortcuts, dark/light | ✅ |
-| Performance lab k6 adapter (deferred by design), Failure lab, AI investigator, Challenge arena | planned — see [ROADMAP](docs/ROADMAP.md) |
+| **Experiment platform** | Experiments, runs, lifecycle, events, artifacts in PostgreSQL (Flyway). A durable run queue (`FOR UPDATE SKIP LOCKED`). Every run executes in its **own JVM**: heap cap, empty environment, private temp dir, timeout, output caps, process-tree kill. |
+| **Statistics** | Baseline vs candidate: bootstrap CI of the ratio of medians and Mann–Whitney U, with parameter and environment diffs. A regression gate against a pinned baseline that refuses a verdict when runs are not comparable. |
+| **Concurrency Lab** | Lost update, deadlock, visibility, backpressure, **livelock** and **starvation** (24 implementations). Stress mode on real cores, a deterministic **interleaving explorer** (every schedule, with a counterexample), and a **liveness explorer** that builds the full state graph and finds fair cycles without progress. |
+| **Performance Lab** | An embedded loopback HTTP service under an open-model load. Latency is measured from the intended send time (coordinated-omission corrected, HdrHistogram), alongside service time, queue wait and the Little's-law bound. **JFR, CPU utilisation and wall-clock worker-thread sampling** show whether a plateau is computing or waiting. |
+| **JVM Lab** | Java Flight Recorder inside the runner, summarised there: hot methods, allocation sites, GC pauses, contended locks. JIT warm-up from the first call (tiered / C1 / C2 / interpreter). Allocation-heavy vs allocation-light code. Lock contention. |
+| **Database Studio** | A disposable lab database with a restricted role and seeded data per run. Index experiments, OFFSET vs keyset pagination, N+1, and SQL lost updates under isolation levels. EXPLAIN (ANALYZE, BUFFERS) plan trees. |
+| **Failure Lab** | A dependency started inside the run gets latency, HTTP 500s, dropped connections or a restart injected. Six client policies are compared: no timeout, timeout, immediate retries, backoff with jitter, retry budget, circuit breaker. A per-window recovery timeline makes **metastable retry storms** visible. |
+| **Algorithm Lab** | Membership lookup with 4 data structures, measured with JMH. |
+| **AI Investigator** | An evidence bundle with a citation id on every item, and rule-based findings that work with no model at all. An optional model (Anthropic or a local server) gets its answers checked: citations that don't exist, and numbers that aren't in the evidence, are flagged. |
+| **Challenge Arena** | Eight measurable problems. Hypothesis first, hints counted, review questions recorded. Complete **only** when every criterion passes on recorded runs. |
+| **Engineering Review Board, notebook, reports** | An explicit evidence rubric with reviewer questions, a searchable notebook, and Markdown report export (PDF via print). |
+| **Web UI** | Dashboard, experiment workspace, per-lab evidence views, compare, investigate, review, command palette, keyboard shortcuts, dark and light themes. Automated accessibility checks (axe-core, WCAG 2.1 AA token contrast). |
+| **Tests** | 190+ JVM tests (Testcontainers PostgreSQL 17), 67 UI tests. CI also starts the hardened container, asserts its isolation settings and runs every scenario through the API. |
+| Not done | A k6 adapter (deferred by design) and a dedicated runner container without a database route. See [ROADMAP](docs/ROADMAP.md) and [SECURITY](docs/SECURITY.md). |
+
+### The three showcase demonstrations (Dashboard)
+
+* **The Invisible Race**: the explorer finds 4 of 6 losing schedules for `balance = balance + 1`. The fixed version is checked exhaustively (226 schedules) and under 20 stress trials. The demo also explains why tests still prove nothing about the absence of races.
+* **The Query That Wouldn't Scale**: at page 2,000, OFFSET reads 100,000 rows to return 50 (13.6 ms) while keyset reads 50 (1.9 ms). Both plans are shown side by side.
+* **The Performance Mystery**: a 4-thread service plateaus at 190 req/s of 300 offered, with p99 at the 2 s timeout. JFR's CPU samples point at `CpuWork.spin`. The wall-clock sampler shows the workers are **96.7% blocked in `Thread.sleep` waiting on the downstream call**, at 19% CPU. A non-blocking downstream with the same 4 threads serves 300 req/s at p99 23.5 ms.
 
 ## Quick start
 
@@ -118,9 +126,11 @@ the API returns. See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the decisions a
 
 ```
 forge-lab/      plain Java: scenario SPI, scenarios, controlled scheduler, statistics, runner
-forge-server/   Spring Boot: REST API, PostgreSQL/Flyway, run queue, launcher, comparison, review, reports
+forge-server/   Spring Boot: REST API, PostgreSQL/Flyway, run queue, launcher, comparison, review, reports,
+                investigator, challenges
 forge-ui/       React + TypeScript + Vite + Tailwind
 docs/           architecture, methodology, security, testing, roadmap
+scripts/        e2e_smoke.py — every scenario through the API of a running deployment
 ```
 
 ## Documentation

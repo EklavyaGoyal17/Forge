@@ -6,7 +6,7 @@ or a recorded manual check. Status values: `done`, `in progress`, `not started`.
 | Phase | Theme | Status |
 |---|---|---|
 | 0 | Architecture & documentation | done |
-| 1 | Working experiment platform | done (CI workflow not yet executed on GitHub) |
+| 1 | Working experiment platform | done |
 | 2 | Performance lab (HTTP) | done except the k6 adapter (deferred by design, see below) |
 | 3 | Concurrency lab | done |
 | 4 | Database studio | done |
@@ -14,7 +14,7 @@ or a recorded manual check. Status values: `done`, `in progress`, `not started`.
 | 6 | Failure lab | done |
 | 7 | AI investigator | done (no real-API call verified; see below) |
 | 8 | Challenge arena | done |
-| 9 | Hardening | not started |
+| 9 | Hardening | done except the dedicated runner container (see below) |
 
 `[x]` = implemented and verified by an automated test or a recorded check; `[~]` = implemented but not
 fully verified; `[ ]` = not done.
@@ -31,8 +31,8 @@ fully verified; `[ ]` = not done.
 - [x] A timed-out run is killed and recorded as `TIMED_OUT` (integration test).
 - [x] Results visualised per trial; baseline vs candidate comparison with bootstrap CI.
 - [x] Markdown report export.
-- [ ] `docker compose up` starts PostgreSQL + server + UI.
-- [~] CI workflow runs backend and frontend tests. *(written; the same commands pass locally; not yet executed on GitHub — no remote configured)*
+- [x] `docker compose up` starts PostgreSQL + server + UI. *(CI starts the stack and runs every scenario through it — Phase 9)*
+- [x] CI workflow runs backend and frontend tests on GitHub Actions (JDK 21, Node 22, Testcontainers).
 
 ## Phase 2 — Performance lab
 - [x] Open-model (constant arrival rate) HTTP load generator with coordinated-omission-correct latency (HdrHistogram). *(`OpenLoopGeneratorTest`: virtual-clock server stall with hand-derived p99 — 1 ms from actual send vs 910 ms from intended send)*
@@ -88,4 +88,9 @@ Recorded end-to-end check (2026-10-19, development machine: i7-12650H, 16 logica
 - [x] Recorded check (2026-10-21, Docker container): "The invisible race" completed with real runs — `unsynchronized` explorer 4 of 6 schedules lose an update; `atomic-cas` 226 exhaustive schedules, 0 violations; 20 stress trials × 4 threads, 0 lost updates. "The misleading benchmark" completed: linear-array vs hash-set at 16 elements was **slower** at every hit rate (ratio 1.63 at 100% hits, 2.10 at 50%, 3.65 at 0%) and 389× slower at 10,000 — the challenge was redesigned after its first version assumed the opposite (ADR-015).
 
 ## Phase 9 — Hardening
-- [ ] Dedicated runner container without database route; seccomp profile; accessibility audit; full E2E tests.
+- [x] End-to-end tests of the deployed artifact: CI builds the image, starts the compose stack, and `scripts/e2e_smoke.py` runs one real run of every scenario through the API, then checks the UI (index, hashed asset, client-side route), the rule-based investigator and the challenge list. (API level, not browser automation: UI behaviour is covered by component tests, and the views were checked in a browser.)
+- [x] Isolation settings asserted at runtime in CI: read-only root filesystem, not privileged, all capabilities dropped (`CapEff` and `CapBnd` 0), `no-new-privileges`, non-root user, and **seccomp in filter mode** (Docker's default profile; a stricter custom profile was not adopted — the JVM's syscall set is broad, and a profile that kills the runner mid-run would be worse than the default).
+- [x] Accessibility: axe-core (WCAG 2.1 A/AA) over the shell and the main evidence views, with a test that proves it detects planted violations; WCAG contrast of every text token on every surface in both themes, which found and fixed five failing tokens (light accent was 3.38:1). Not done: a manual screen-reader pass.
+- [x] Demo Three, The Performance Mystery: JFR, CPU utilisation and wall-clock worker-thread sampling in the HTTP scenario (v3). Recorded (2026-10-21, container, 4 CPUs, defaults): blocking pool 189.7 of 300 req/s, p99 2,000.9 ms (timeout), workers 96.7% blocked in `Thread.sleep ← blockingDownstreamCall`, 0% idle, process CPU 19.0%, while JFR's on-CPU samples rank `CpuWork.spin` first (77%) — a CPU profile alone points at the wrong thing. Non-blocking downstream, same 4 workers: 300 req/s, p99 23.5 ms, workers 95.3% idle. Virtual threads: 300 req/s, p99 23.3 ms.
+- [x] CI failures found and fixed: a JFR test that assumed CPU samples within 300 ms (0 samples on JDK 21 in a container); a UI test environment without `scrollIntoView`.
+- [ ] Dedicated runner container without a database route. Runner JVMs still share the server container's network namespace (residual risk 2 in SECURITY.md); they receive no platform credentials, and the lab role cannot connect to the platform database. Doing this properly needs a runner service in its own container or Docker access from the server, which is itself a risk — left as a documented design decision rather than a half-measure.

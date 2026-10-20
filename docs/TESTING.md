@@ -5,6 +5,14 @@ FORGE's tests are organised by what could go wrong, not by layer. Everything bel
 
 ## How to run
 
+End to end, against a running stack (`docker compose up -d --build --wait`):
+
+```bash
+python3 scripts/e2e_smoke.py http://127.0.0.1:8090
+```
+
+Unit and integration tests:
+
 ```bash
 mvn verify                     # forge-lab + forge-server (server integration tests need Docker; skipped without it)
 cd forge-ui && npm test        # Vitest + Testing Library
@@ -195,6 +203,9 @@ bug: the first container build served `index.html` but 404'd every asset.)
   question and showing the stored rule-based answer.
 * Challenge Arena: progress on the list, hypothesis required to start, criteria with evidence, hint
   counting, queueing the starting run, saving review answers, completion banner.
+* Accessibility (`a11y.test.tsx`, `contrast.test.ts`): axe-core WCAG 2.1 A/AA rules on the shell, run
+  form, liveness, failure, investigator and challenge views (a planted-violation test proves detection);
+  4.5:1 contrast for every text token on every surface in both themes and for button text on the accent.
 * Run configuration form: variants disabled outside their supported modes, mode-specific parameters, client-side bounds mirroring the server,
   variant source display, submission payload, explore mode forcing a single trial.
 
@@ -256,9 +267,11 @@ table, hot methods, allocation, GC and lock tables from the stored results (chec
 through the DOM; a screenshot of the warm-up chart was taken on an earlier run of the same build stage). Numbers are in ROADMAP.md, Phase 5.
 
 ## Known gaps
-* The JVM Lab has not been run in the Docker image (Temurin 21 JRE); JFR is part of that runtime,
-  but the run has not been recorded there.
-* No browser end-to-end tests (Playwright) yet — planned for phase 9.
-* Accessibility is designed in (semantic tables, labelled controls, focus rings, text alternatives
-  for chart data) but has not been audited with assistive technology.
+* End-to-end coverage of the deployed image is at the API level (`scripts/e2e_smoke.py` in CI); there
+  is no browser automation (Playwright). UI behaviour is covered by component tests.
+* Accessibility is checked automatically (axe-core on jsdom, token contrast) but has not been audited
+  with a screen reader; layout-dependent rules (rendered contrast over images, reflow) are not covered
+  by jsdom.
+* The real Anthropic API is never called by tests (it needs a key and is billed); the SDK path is
+  tested against a local stub of the Messages API.
 * Load on the API itself is not tested; FORGE is a single-user local tool.

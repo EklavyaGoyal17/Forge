@@ -84,6 +84,9 @@ network interface.
 * PostgreSQL is reachable only on the internal compose network and is published to the host on
   `127.0.0.1` only.
 * No privileged containers, no Docker socket mounts.
+* Docker's default **seccomp** profile applies (verified at runtime: `Seccomp: 2`, filter mode).
+* CI asserts all of the above on the running container (`.github/workflows/ci.yml`, job "Hardened
+  container, end to end").
 
 ## 3. Residual risks (honest list)
 

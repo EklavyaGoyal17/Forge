@@ -104,7 +104,8 @@ export function InvestigatorPanel({ experimentId, runsKey }: { experimentId: str
   const ids = new Set(a.evidence.map((e) => e.id))
   const reveal = (id: string) => {
     setOpen(id)
-    requestAnimationFrame(() => document.getElementById(`evidence-${id}`)?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
+    // scrollIntoView is missing in some environments (jsdom); revealing the item must not depend on it
+    requestAnimationFrame(() => document.getElementById(`evidence-${id}`)?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' }))
   }
   const byKind = (k: FindingKind) => a.findings.filter((f: Finding) => f.kind === k)
 
