@@ -13,7 +13,7 @@ or a recorded manual check. Status values: `done`, `in progress`, `not started`.
 | 5 | JVM lab | done |
 | 6 | Failure lab | done |
 | 7 | AI investigator | done (no real-API call verified; see below) |
-| 8 | Challenge arena | not started |
+| 8 | Challenge arena | done |
 | 9 | Hardening | not started |
 
 `[x]` = implemented and verified by an automated test or a recorded check; `[~]` = implemented but not
@@ -83,7 +83,9 @@ Recorded end-to-end check (2026-10-19, development machine: i7-12650H, 16 logica
 - [x] Every model answer is checked against the evidence (unknown citations, numbers not in the evidence) and stored with the evidence ids it used.
 
 ## Phase 8 — Challenge arena
-- [ ] Challenges defined as scenario + verification predicate; completion only by measured criteria.
+- [x] Eight challenges defined as scenario + verification criteria over recorded runs; completion only by measured criteria (ADR-015): the slow endpoint (N+1), the query that wouldn't scale (index, plan, identical rows), the invisible race, allocation pressure, unstable dependency, thread-pool starvation (without adding threads), find the regression (regression gate), the misleading benchmark.
+- [x] Hypothesis before starting, hints revealed one at a time and counted, technical-review answers stored and never graded.
+- [x] Recorded check (2026-10-21, Docker container): "The invisible race" completed with real runs — `unsynchronized` explorer 4 of 6 schedules lose an update; `atomic-cas` 226 exhaustive schedules, 0 violations; 20 stress trials × 4 threads, 0 lost updates. "The misleading benchmark" completed: linear-array vs hash-set at 16 elements was **slower** at every hit rate (ratio 1.63 at 100% hits, 2.10 at 50%, 3.65 at 0%) and 389× slower at 10,000 — the challenge was redesigned after its first version assumed the opposite (ADR-015).
 
 ## Phase 9 — Hardening
 - [ ] Dedicated runner container without database route; seccomp profile; accessibility audit; full E2E tests.

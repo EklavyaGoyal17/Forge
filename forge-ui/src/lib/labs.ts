@@ -20,7 +20,7 @@ export const MODULES: ModuleInfo[] = [
   { path: '/labs/database', label: 'Database Studio', shortcut: 'g b', lab: 'DATABASE', implemented: true, blurb: 'PostgreSQL plans, indexes, pagination strategies and lock contention on seeded data.' },
   { path: '/labs/failure', label: 'Failure Lab', shortcut: 'g f', lab: 'FAILURE', implemented: true, blurb: 'Latency, errors, dropped connections and restarts injected into a dependency inside the run — and what timeouts, retries, budgets and circuit breakers do about it.' },
   { path: '/labs/algorithms', label: 'Algorithm Lab', shortcut: 'g a', lab: 'ALGORITHMS', implemented: true, blurb: 'How data-structure choices behave on real hardware, measured with JMH.' },
-  { path: '/challenges', label: 'Challenge Arena', shortcut: 'g h', implemented: false, phase: 8, blurb: 'Measurable engineering problems verified by tests and recorded evidence.' },
+  { path: '/challenges', label: 'Challenge Arena', shortcut: 'g h', implemented: true, blurb: 'Eight measurable engineering problems. Complete only when every criterion passes on your recorded runs — never by AI judgement.' },
   { path: '/investigator', label: 'AI Investigator', shortcut: 'g i', implemented: true, blurb: 'Evidence-grounded analysis of your runs: rule-based findings that cite stored evidence, and optional questions to a model whose answers are checked against it.' },
   { path: '/notebook', label: 'Experiment Notebook', shortcut: 'g n', implemented: true, blurb: 'Your archive of investigations, decisions and reports.' },
 ]

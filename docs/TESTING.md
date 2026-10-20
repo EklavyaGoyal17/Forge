@@ -140,6 +140,20 @@ regression even when the metric improved; secondary regressions are listed but d
   system prompt and the evidence → the stored answer lists the stub's invented number and unknown
   citation. The real Anthropic API is not called by any test.
 
+### Challenge Arena (`forge-server/.../challenge/ChallengeCriteriaTest`, `InvestigatorIntegrationTest.challengeAttemptLifecycle`)
+* Criteria on synthetic recorded runs, step by step, with the exact expected PASS / NOT_YET sequence:
+  the race (explorer reproduction; a fix explored with only 1 deposit per thread does not count; stress
+  with < 20 trials or of a never-explored variant does not count), the misleading benchmark (different
+  hit rates are not comparable; a slower scan is a valid decisive finding; an indistinguishable pair is
+  not decisive), the slow API (an interval that reaches the 5× threshold is not enough), the unstable
+  dependency (a lighter load than the storm run does not count).
+* Every challenge names a real scenario, a valid starting variant and parameters, hints, review
+  questions and at least two criteria.
+* Through the API on PostgreSQL: hypothesis required, 404 for unknown challenges, the attempt's
+  experiment is created and tagged, the challenge's own starting run (a real explorer run) passes the
+  first criterion with its evidence, hints are capped at the number available, answers are validated
+  and stored, the list shows progress.
+
 ### Runner protocol (`forge-lab/.../runner/RunnerProcessTest`)
 Launches `RunnerMain` as a real child process: a valid spec produces a result with environment
 and JVM flags; invalid parameters, unknown scenarios and non-JSON input exit with code 2 without
@@ -179,6 +193,8 @@ bug: the first container build served `index.html` but 404'd every asset.)
 * Investigator panel: findings grouped by kind, the off-host warning before asking, the answer check
   (unknown citations struck through, unverified numbers listed), opening cited evidence, asking a
   question and showing the stored rule-based answer.
+* Challenge Arena: progress on the list, hypothesis required to start, criteria with evidence, hint
+  counting, queueing the starting run, saving review answers, completion banner.
 * Run configuration form: variants disabled outside their supported modes, mode-specific parameters, client-side bounds mirroring the server,
   variant source display, submission payload, explore mode forcing a single trial.
 

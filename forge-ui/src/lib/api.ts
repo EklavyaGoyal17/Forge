@@ -604,7 +604,8 @@ export interface CreateRunRequest {
   params: Record<string, number | string | boolean>
   seed?: number
   trials: number
-  warmupTrials: number
+  /** omitted: the scenario's default */
+  warmupTrials?: number
   role: RunRole
   label?: string
   heapMb?: number
@@ -630,6 +631,36 @@ export interface Investigation {
   evidenceIds: string[]
   createdAt: string
 }
+
+// ---- Challenge Arena ----
+
+export interface ChallengeInfo {
+  id: string
+  number: number
+  title: string
+  scenarioId: string
+  lab: Lab | null
+  problem: string
+  goal: string
+  question: string
+  start: { variant: string; params: Record<string, string | number | boolean>; trials: number }
+  hintCount: number
+  reviewQuestions: string[]
+  criteria: string[]
+}
+export interface CriterionResult { id: string; description: string; status: 'PASS' | 'NOT_YET'; evidence: string; runs: number[] }
+export interface ChallengeAttempt { id: string; challengeId: string; experimentId: string; hintsRevealed: number; answers: Record<string, string>; startedAt: string; completedAt: string | null }
+export interface AttemptView {
+  challenge: ChallengeInfo
+  attempt: ChallengeAttempt
+  experimentTitle: string
+  successfulRuns: number
+  criteria: CriterionResult[]
+  passed: number
+  complete: boolean
+  hints: string[]
+}
+export interface ChallengeSummary { challenge: ChallengeInfo; latest: AttemptView | null; attempts: number; everCompleted: boolean }
 
 export const api = {
   system: () => request<SystemView>('GET', '/system'),
@@ -664,4 +695,10 @@ export const api = {
   investigation: (id: string) => request<InvestigationAnalysis>('GET', `/experiments/${id}/investigation`),
   investigations: (id: string) => request<Investigation[]>('GET', `/experiments/${id}/investigation/questions`),
   ask: (id: string, question: string) => request<Investigation>('POST', `/experiments/${id}/investigation/questions`, { question }),
+  challenges: () => request<ChallengeSummary[]>('GET', '/challenges'),
+  challenge: (id: string) => request<{ challenge: ChallengeInfo; attempts: AttemptView[] }>('GET', `/challenges/${encodeURIComponent(id)}`),
+  startChallenge: (id: string, hypothesis: string) => request<AttemptView>('POST', `/challenges/${encodeURIComponent(id)}/attempts`, { hypothesis }),
+  attempt: (id: string) => request<AttemptView>('GET', `/challenge-attempts/${id}`),
+  revealHint: (id: string) => request<AttemptView>('POST', `/challenge-attempts/${id}/hints`),
+  saveAnswers: (id: string, answers: Record<string, string>) => request<AttemptView>('PUT', `/challenge-attempts/${id}/answers`, answers),
 }

@@ -260,6 +260,26 @@ Alternatives considered: tool use (letting the model query runs itself) — more
 keeps what the model saw reviewable and identical to what the UI shows; free-form chat without a
 checker — rejected, it would make the model an oracle.
 
+### ADR-015 — Challenge Arena: criteria over recorded runs, no uploaded code (implemented)
+A challenge is a measurable problem on a built-in scenario plus **criteria**: predicates over the
+successful runs of the attempt's experiment (and its regression gate). Each criterion returns PASS or
+NOT_YET with the evidence it used — run numbers, medians, ratio intervals — so completion is always
+explained by data. An attempt is an experiment created with the user's hypothesis (required before
+starting); hints are revealed one at a time and counted; review answers are stored and never graded.
+`completed_at` records when all criteria first passed.
+
+Because FORGE runs no uploaded code (ADR-003), a challenge is solved by finding the right change among
+the scenario's implementations and parameters and proving it — reproduce the problem, show the fix on
+the same workload with an interval that excludes the threshold, confirm correctness — which is the
+skill of validating a fix in a real system. Comparison criteria require the same workload parameters
+(e.g. dataset seed and size) between baseline and candidate.
+
+Criteria judge the method, not a predetermined outcome, where the outcome is an empirical question.
+The first version of "The misleading benchmark" required the linear scan to win at 16 elements; on
+FORGE's container it is 1.6–3.7× *slower* at every hit rate, so that criterion could not be honestly
+met. It now requires decisive comparisons (95% interval excluding 1, either direction) at a small size,
+a large size and two hit rates, and reports which way each went.
+
 ## 4. Technology choices
 
 | Choice | Why | Trade-off |
@@ -323,4 +343,3 @@ explicit and reviewable.
 | Component | Phase | Notes |
 |---|---|---|
 | k6 adapter | 2 (deferred) | Needs Docker access from the runner and a target reachable from a container; to be designed with the dedicated runner container (Phase 9). The open-model generator, embedded target and pinned-baseline regression gate are implemented. |
-| Challenge Arena | 8 | Challenges = scenario + verification predicate over recorded results. |

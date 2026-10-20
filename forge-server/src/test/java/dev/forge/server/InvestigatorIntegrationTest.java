@@ -170,6 +170,59 @@ class InvestigatorIntegrationTest {
         call("POST", "/api/experiments/" + exp + "/investigation/questions", Map.of("question", " "), 400);
     }
 
+    /** Challenge Arena through the API: hypothesis first, a real run passes a criterion, hints counted, answers stored. */
+    @Test
+    void challengeAttemptLifecycle() throws Exception {
+        JsonNode list = call("GET", "/api/challenges", null, 200);
+        assertThat(list.size()).isEqualTo(8);
+        call("POST", "/api/challenges/race/attempts", Map.of("hypothesis", "  "), 400);
+        call("POST", "/api/challenges/nope/attempts", Map.of("hypothesis", "x"), 404);
+
+        JsonNode attempt = call("POST", "/api/challenges/race/attempts",
+                Map.of("hypothesis", "read-then-write loses updates; a CAS loop or a lock fixes it"), 201);
+        String id = attempt.get("attempt").get("id").asString();
+        String exp = attempt.get("attempt").get("experimentId").asString();
+        assertThat(attempt.get("passed").asInt()).isZero();
+        assertThat(attempt.get("complete").asBoolean()).isFalse();
+        assertThat(attempt.get("hints").size()).isZero();
+        JsonNode experiment = call("GET", "/api/experiments/" + exp, null, 200).get("experiment");
+        assertThat(experiment.get("title").asString()).isEqualTo("Challenge 3: The invisible race");
+        assertThat(experiment.get("tags").toString()).contains("challenge").contains("race");
+
+        // the challenge's own starting run reproduces the bug deterministically
+        JsonNode start = attempt.get("challenge").get("start");
+        String run = call("POST", "/api/experiments/" + exp + "/runs", Map.of("variant", start.get("variant").asString(),
+                "params", mapper.convertValue(start.get("params"), Map.class), "trials", start.get("trials").asInt()), 202).get("id").asString();
+        await(run);
+        JsonNode after = call("GET", "/api/challenge-attempts/" + id, null, 200);
+        assertThat(after.get("criteria").get(0).get("status").asString()).isEqualTo("PASS");
+        assertThat(after.get("criteria").get(0).get("evidence").asString()).contains("of 6 schedules lose an update");
+        assertThat(after.get("criteria").get(1).get("status").asString()).isEqualTo("NOT_YET");
+        assertThat(after.get("passed").asInt()).isEqualTo(1);
+
+        for (int i = 0; i < 5; i++) {
+            call("POST", "/api/challenge-attempts/" + id + "/hints", null, 200);
+        }
+        JsonNode hinted = call("GET", "/api/challenge-attempts/" + id, null, 200);
+        assertThat(hinted.get("attempt").get("hintsRevealed").asInt()).isEqualTo(3);   // capped at the number of hints
+        assertThat(hinted.get("hints").size()).isEqualTo(3);
+
+        JsonNode saved = call("PUT", "/api/challenge-attempts/" + id + "/answers", Map.of("0", "stress can only show presence"), 200);
+        assertThat(saved.get("attempt").get("answers").get("0").asString()).isEqualTo("stress can only show presence");
+        call("PUT", "/api/challenge-attempts/" + id + "/answers", Map.of("9", "x"), 400);
+
+        JsonNode summary = call("GET", "/api/challenges", null, 200);
+        JsonNode race = null;
+        for (JsonNode s : summary) {
+            if (s.get("challenge").get("id").asString().equals("race")) {
+                race = s;
+            }
+        }
+        assertThat(race).isNotNull();
+        assertThat(race.get("attempts").asInt()).isEqualTo(1);
+        assertThat(race.get("latest").get("passed").asInt()).isEqualTo(1);
+    }
+
     private static String header(Captured c, String name) {
         return c.headers().entrySet().stream().filter(e -> e.getKey().equalsIgnoreCase(name)).findFirst()
                 .map(e -> String.join(",", e.getValue())).orElse(null);

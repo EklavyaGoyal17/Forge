@@ -4,20 +4,17 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider, createBrowserRouter } from 'react-router'
 import { Layout } from './components/Layout'
 import './index.css'
-import { MODULES } from './lib/labs'
+import { ChallengePage, ChallengesPage } from './pages/Challenges'
 import { Dashboard } from './pages/Dashboard'
 import { ExperimentPage } from './pages/ExperimentPage'
 import { ExperimentsPage, NewExperimentPage } from './pages/Experiments'
 import { InvestigatorPage } from './pages/Investigator'
 import { LabPage } from './pages/LabPage'
 import { NotebookPage } from './pages/Notebook'
-import { PlannedModule } from './pages/PlannedModule'
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { refetchOnWindowFocus: false, retry: 1 } },
 })
-
-const module = (path: string) => MODULES.find((m) => m.path === path)!
 
 const router = createBrowserRouter([
   {
@@ -34,7 +31,8 @@ const router = createBrowserRouter([
       { path: 'labs/jvm', element: <LabPage lab="JVM" /> },
       { path: 'labs/database', element: <LabPage lab="DATABASE" /> },
       { path: 'labs/failure', element: <LabPage lab="FAILURE" /> },
-      { path: 'challenges', element: <PlannedModule module={module('/challenges')} /> },
+      { path: 'challenges', element: <ChallengesPage /> },
+      { path: 'challenges/:id', element: <ChallengePage /> },
       { path: 'investigator', element: <InvestigatorPage /> },
       { path: 'notebook', element: <NotebookPage /> },
       { path: '*', element: <div className="p-6 text-dim">Page not found.</div> },
