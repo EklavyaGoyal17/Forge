@@ -15,7 +15,7 @@ import java.util.Map;
 import java.util.SplittableRandom;
 
 /** Helpers shared by the JVM Lab scenarios. */
-final class JvmLab {
+public final class JvmLab {
 
     /** Frames in this package are "application code" in the JFR tables. */
     static final String PACKAGE = "dev.forge.lab.scenarios.jvm";
@@ -39,7 +39,7 @@ final class JvmLab {
     }
 
     /** What the JIT is doing in this JVM, as far as the JVM reports it. */
-    static Map<String, Object> jitMode(VariantSpec variant) {
+    public static Map<String, Object> jitMode(VariantSpec variant) {
         Map<String, Object> m = new LinkedHashMap<>();
         var jit = ManagementFactory.getCompilationMXBean();
         m.put("variantFlags", variant.jvmFlags());
@@ -58,7 +58,7 @@ final class JvmLab {
         return a;
     }
 
-    static JfrSummary stopAndSummarise(JfrCapture capture, RunContext ctx, JfrSummariser.Options options)
+    public static JfrSummary stopAndSummarise(JfrCapture capture, RunContext ctx, JfrSummariser.Options options)
             throws IOException {
         var file = capture.stop();
         long t0 = System.nanoTime();

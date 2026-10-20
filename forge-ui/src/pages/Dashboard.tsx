@@ -6,7 +6,7 @@ import { api } from '../lib/api'
 import { bytes, duration, relativeTime, runDuration } from '../lib/format'
 import { ExperimentTable } from './Experiments'
 
-const SHOWCASES = [
+const SHOWCASES: { title: string; text: string; available: boolean; to?: string; needs?: string }[] = [
   {
     title: 'The Invisible Race',
     text: 'A shared balance loses deposits under contention. Measure it, enumerate every interleaving, repair it, and verify the invariant — then see why passing tests are not a proof.',
@@ -22,8 +22,8 @@ const SHOWCASES = [
   {
     title: 'The Performance Mystery',
     text: 'A service whose throughput plateaus under load: open-model load tests, JFR profiles, a fix, and a comparable re-run.',
-    available: false,
-    needs: 'JFR profiling inside the HTTP load scenario (the Performance and JVM labs exist, but are not combined yet)',
+    available: true,
+    to: '/experiments/new?scenario=performance.thread-pool-starvation&demo=mystery',
   },
 ]
 

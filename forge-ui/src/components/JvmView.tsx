@@ -57,7 +57,8 @@ export function JvmView({ details }: { details: JvmDetails }) {
   }
   const order = details.kind === 'warmup' ? ['warmup', 'cpu', 'gc', 'allocation', 'locks']
     : details.kind === 'allocation' ? ['allocation', 'gc', 'cpu', 'locks']
-      : ['locks', 'cpu', 'gc', 'allocation']
+      : details.kind === 'profile' ? ['cpu', 'locks', 'gc', 'allocation']
+        : ['locks', 'cpu', 'gc', 'allocation']
 
   return (
     <section aria-label="JVM evidence" className="flex flex-col gap-6">

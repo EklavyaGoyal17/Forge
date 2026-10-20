@@ -106,4 +106,51 @@ class PerformanceScenarioTest {
         assertThat(r.errors()).extracting(ParameterValidator.FieldError::field)
                 .contains("params.rate", "params.connections", "trials", "warmupTrials");
     }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void profilingRecordsCpuUtilisationWorkerStatesAndAJfrSummary() throws Exception {
+        ScenarioResult r = run("blocking-pool", RunContext.noop(work));
+        assertThat(r.trials()).allSatisfy(t -> {
+            assertThat(t.metrics()).containsKeys("cpuUtilizationPercent", "workersBlockedPercent", "workersIdlePercent");
+            assertThat(t.metrics().get("cpuUtilizationPercent")).isBetween(0.0, 100.0 * 1.05);
+            assertThat(t.metrics().get("workersBlockedPercent") + t.metrics().get("workersIdlePercent")).isBetween(0.0, 100.0);
+        });
+        Map<String, Object> trial = ((List<Map<String, Object>>) ((Map<String, Object>) r.details().get("httpLoad")).get("trials")).getFirst();
+        Map<String, Object> workers = (Map<String, Object>) trial.get("workerThreads");
+        assertThat((Long) workers.get("threadSamples")).isPositive();
+        assertThat(((List<Map<String, Object>>) workers.get("topFrames"))).isNotEmpty();
+        Map<String, Object> jvm = (Map<String, Object>) r.details().get("jvm");
+        assertThat(jvm.get("kind")).isEqualTo("profile");
+        assertThat(jvm).containsKeys("jitMode", "jfr");
+    }
+
+    @Test
+    void virtualThreadWorkersAreNotSampledAndProfilingCanBeSwitchedOff() throws Exception {
+        ScenarioResult vt = run("virtual-threads", RunContext.noop(work));
+        assertThat(vt.trials()).allSatisfy(t -> assertThat(t.metrics()).doesNotContainKey("workersBlockedPercent"));
+
+        Scenario s = ScenarioCatalog.find(ThreadPoolStarvationScenario.ID).orElseThrow();
+        Map<String, Object> off = new java.util.HashMap<>(SMALL);
+        off.put("profile", false);
+        ParameterValidator.Result v = ParameterValidator.validate(s.descriptor(), "blocking-pool", off, 1, 0);
+        ScenarioResult r = s.run(new RunSpec("test", s.descriptor().id(), s.descriptor().version(), "blocking-pool", v.params(), 1, 1, 0), RunContext.noop(work));
+        assertThat(r.details()).doesNotContainKey("jvm");
+        assertThat(r.trials().getFirst().metrics()).containsKey("cpuUtilizationPercent").doesNotContainKey("workersBlockedPercent");
+    }
+
+    @Test
+    void workerFramesNameTheApiCallAndTheForgeCallerOrIdleness() {
+        StackTraceElement sleep0 = new StackTraceElement("java.lang.Thread", "sleep0", null, -2);
+        StackTraceElement sleep = new StackTraceElement("java.lang.Thread", "sleep", null, 1);
+        StackTraceElement call = new StackTraceElement("dev.forge.lab.scenarios.performance.TargetService$Call", "blockingDownstreamCall", null, 10);
+        assertThat(dev.forge.lab.scenarios.performance.WorkerSamplerAccess.topFrame(new StackTraceElement[] {sleep0, sleep, call}))
+                .isEqualTo("Thread.sleep ← TargetService$Call.blockingDownstreamCall");
+        StackTraceElement park = new StackTraceElement("jdk.internal.misc.Unsafe", "park", null, -2);
+        StackTraceElement lockPark = new StackTraceElement("java.util.concurrent.locks.LockSupport", "park", null, 1);
+        StackTraceElement take = new StackTraceElement("java.util.concurrent.LinkedBlockingQueue", "take", null, 1);
+        StackTraceElement getTask = new StackTraceElement("java.util.concurrent.ThreadPoolExecutor", "getTask", null, 1);
+        assertThat(dev.forge.lab.scenarios.performance.WorkerSamplerAccess.topFrame(new StackTraceElement[] {park, lockPark, take, getTask}))
+                .startsWith("idle: waiting for a request");
+    }
 }

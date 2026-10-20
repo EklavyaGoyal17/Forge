@@ -54,7 +54,7 @@ public final class ThreadPoolStarvationScenario implements Scenario {
     private static final long TRIAL_OVERHEAD_NANOS = 1_000_000_000L;
 
     private static final ScenarioDescriptor DESCRIPTOR = new ScenarioDescriptor(
-            ID, 2, Lab.PERFORMANCE,           // v2: TCP_NODELAY on the embedded server (Nagle + delayed ACK added up to 40 ms on Linux)
+            ID, 3, Lab.PERFORMANCE,           // v2: TCP_NODELAY (Nagle + delayed ACK added up to 40 ms on Linux); v3: profiling
             "Thread-pool starvation under open-model HTTP load",
             "An embedded HTTP service on loopback does CPU work and then waits on a slow downstream. Drive it at a constant arrival rate and watch what a small blocking pool, a bigger pool, a non-blocking design and virtual threads do to throughput, tail latency and queueing.",
             "When requests block a worker thread on a slow downstream, does throughput plateau at workers ÷ service time (Little's law), and what happens to tail latency once the offered rate exceeds it?",
@@ -75,7 +75,9 @@ public final class ThreadPoolStarvationScenario implements Scenario {
                     ParameterSpec.integer("connections", "Max connections", 64, 1, 256, "connections",
                             "Client connection limit = maximum requests in flight. When all are busy, the generator waits; that wait counts towards latency."),
                     ParameterSpec.integer("requestTimeoutMs", "Request timeout", 2_000, 100, 5_000, "ms",
-                            "Measured from the intended send time. Requests without a response by then are counted as errors.")),
+                            "Measured from the intended send time. Requests without a response by then are counted as errors."),
+                    ParameterSpec.bool("profile", "Profile", true,
+                            "Record Java Flight Recorder and sample the worker threads' states every 10 ms during the sustained phase. Adds a little overhead; switch off to measure without it.")),
             List.of(
                     new VariantSpec("blocking-pool", "Blocking handler, small pool",
                             "Each request holds one of poolSize worker threads for its CPU work and its whole downstream wait.", null, SRC + "blocking-pool"),
@@ -109,7 +111,13 @@ public final class ThreadPoolStarvationScenario implements Scenario {
                     new MetricSpec("littleBoundRps", "Little's-law capacity", "req/s", Direction.NEUTRAL,
                             "workers ÷ worker time per request: the most this pool can complete per second (pool designs only)."),
                     new MetricSpec("timerLagP99Ms", "Generator timer lag p99", "ms", Direction.LOWER_IS_BETTER,
-                            "How late the load generator woke up for a scheduled send (OS timer granularity, CPU contention).")),
+                            "How late the load generator woke up for a scheduled send (OS timer granularity, CPU contention)."),
+                    new MetricSpec("cpuUtilizationPercent", "Process CPU utilisation", "%", Direction.NEUTRAL,
+                            "Runner-process CPU time ÷ (wall time × available processors) during the sustained phase — client, server and GC together."),
+                    new MetricSpec("workersBlockedPercent", "Workers blocked in a request", "%", Direction.NEUTRAL,
+                            "Share of worker-thread samples inside a request but not running — sleeping, parked or blocked, e.g. waiting on the downstream call. Platform-thread pools only."),
+                    new MetricSpec("workersIdlePercent", "Workers idle", "%", Direction.NEUTRAL,
+                            "Share of worker-thread samples idle in the pool, waiting for a request: spare capacity. Platform-thread pools only.")),
             "latencyP99Ms",
             new ScenarioDescriptor.TrialPolicy(5, 10, 1, 3),
             300,
@@ -168,6 +176,7 @@ public final class ThreadPoolStarvationScenario implements Scenario {
                     totalTrials, perTrialBound / 1e9, available / 1e9));
         }
 
+        boolean profile = spec.boolParam("profile");
         double itersPerMicro = CpuWork.calibrateIterationsPerMicro();
         long cpuIterations = Math.round(cpuWorkUs * itersPerMicro);
         TargetService.Config config = new TargetService.Config(design, poolSize, cpuIterations, downstreamNanos);
@@ -188,10 +197,18 @@ public final class ThreadPoolStarvationScenario implements Scenario {
         long totalErrors = 0;
         long totalTimeouts = 0;
 
+        dev.forge.lab.jvm.JfrCapture capture = profile
+                ? dev.forge.lab.jvm.JfrCapture.start(ctx.workDir(), "http", dev.forge.lab.jvm.JfrCapture.Settings.defaults()) : null;
         for (int t = 0; t < totalTrials; t++) {
             ctx.checkCancelled();
             boolean warmupTrial = t < spec.warmupTrials();
-            TrialData data = runTrial(config, plan, ctx);
+            if (capture != null && !warmupTrial) {
+                dev.forge.lab.jvm.JfrMarker.mark("trial-" + (t - spec.warmupTrials()) + " start");
+            }
+            TrialData data = runTrial(config, plan, ctx, profile);
+            if (capture != null && !warmupTrial) {
+                dev.forge.lab.jvm.JfrMarker.mark("trial-" + (t - spec.warmupTrials()) + " end");
+            }
             workers = data.workers();
             if (warmupTrial) {
                 ctx.progress(t + 1, totalTrials, "warm-up");
@@ -240,6 +257,13 @@ public final class ThreadPoolStarvationScenario implements Scenario {
             if (lag.getTotalCount() > 0) {
                 m.put("timerLagP99Ms", Histograms.ms(lag.getValueAtPercentile(99)));
             }
+            if (Double.isFinite(data.cpuPercent())) {
+                m.put("cpuUtilizationPercent", round(data.cpuPercent(), 1));
+            }
+            if (data.workerThreads() != null && Double.isFinite(data.blockedShare())) {
+                m.put("workersBlockedPercent", round(100 * data.blockedShare(), 1));
+                m.put("workersIdlePercent", round(100 * data.idleShare(), 1));
+            }
             String note = errors == 0 ? null
                     : errors + " errors (" + c.timeouts() + " timeouts, " + c.httpErrors() + " non-200, "
                     + (c.failures() + data.result().unfinished()) + " failed)";
@@ -268,6 +292,9 @@ public final class ThreadPoolStarvationScenario implements Scenario {
             d.put("measureStartMs", rec.measureStartOffsetNanos() / 1e6);
             d.put("measureEndMs", rec.measureEndOffsetNanos() / 1e6);
             d.put("series", rec.series());
+            if (data.workerThreads() != null) {
+                d.put("workerThreads", data.workerThreads());
+            }
             trialDetails.add(d);
             ctx.progress(t + 1, totalTrials, "measured");
         }
@@ -305,15 +332,29 @@ public final class ThreadPoolStarvationScenario implements Scenario {
         details.put("histogram", Map.of("unit", "µs", "significantDigits", Histograms.SIGNIFICANT_DIGITS,
                 "highestTrackableMs", Histograms.HIGHEST_MICROS / 1_000));
         result.detail("httpLoad", details);
+        if (capture != null) {
+            Map<String, Object> jvm = new LinkedHashMap<>();
+            jvm.put("kind", "profile");
+            jvm.put("jitMode", dev.forge.lab.scenarios.jvm.JvmLab.jitMode(DESCRIPTOR.variant(spec.variant()).orElseThrow()));
+            jvm.put("jfr", dev.forge.lab.scenarios.jvm.JvmLab.stopAndSummarise(capture, ctx,
+                    dev.forge.lab.jvm.JfrSummariser.Options.forPackage("dev.forge.lab.scenarios.performance")));
+            result.detail("jvm", jvm);
+        }
 
         observe(result, rate, workers, timeoutNanos / 1e6, totalOffered, totalErrors, totalTimeouts, aggClient, aggUncorrected, aggService, aggQueue);
         return result.build();
     }
 
-    private record TrialData(OpenLoopGenerator.Result result, TargetService.Stats server, int workers) {
+    /**
+     * @param workerThreads sampled worker states and top frames, or null when not profiled
+     * @param blockedShare  share of worker samples inside a request but not running, NaN if not sampled
+     * @param idleShare     share of worker samples idle in the pool, NaN if not sampled
+     */
+    private record TrialData(OpenLoopGenerator.Result result, TargetService.Stats server, int workers, double cpuPercent,
+                             Map<String, Object> workerThreads, double blockedShare, double idleShare) {
     }
 
-    private static TrialData runTrial(TargetService.Config config, OpenLoopGenerator.Plan plan, RunContext ctx) throws Exception {
+    private static TrialData runTrial(TargetService.Config config, OpenLoopGenerator.Plan plan, RunContext ctx, boolean profile) throws Exception {
         try (TargetService target = TargetService.start(config)) {
             AtomicInteger n = new AtomicInteger();
             ExecutorService clientPool = Executors.newCachedThreadPool(r -> {
@@ -336,8 +377,18 @@ public final class ThreadPoolStarvationScenario implements Scenario {
                                 .GET()
                                 .build(),
                         HttpResponse.BodyHandlers.discarding()).thenApply(HttpResponse::statusCode);
-                OpenLoopGenerator.Result r = OpenLoopGenerator.run(plan, NanoClock.SYSTEM, transport, ctx::checkCancelled);
-                return new TrialData(r, target.stats(), target.workers());
+                long start = System.nanoTime();
+                boolean sampleThreads = profile && target.workers() > 0;   // virtual threads are invisible to ThreadMXBean
+                OpenLoopGenerator.Result r;
+                WorkerSampler sampler = new WorkerSampler(10_000_000L, start + plan.warmupNanos(), start + plan.warmupNanos() + plan.measureNanos(), sampleThreads);
+                try {
+                    r = OpenLoopGenerator.run(plan, NanoClock.SYSTEM, transport, ctx::checkCancelled);
+                } finally {
+                    sampler.close();
+                }
+                return new TrialData(r, target.stats(), target.workers(), sampler.cpuUtilizationPercent(),
+                        sampleThreads ? sampler.summary() : null,
+                        sampleThreads ? sampler.blockedShare() : Double.NaN, sampleThreads ? sampler.idleShare() : Double.NaN);
             } finally {
                 client.shutdownNow();
                 clientPool.shutdownNow();
@@ -410,6 +461,17 @@ public final class ThreadPoolStarvationScenario implements Scenario {
         if (lag.length > 0) {
             result.observation(String.format(
                     "The generator's timer woke up late by up to %.2f ms at p99 (median across trials); that lateness is part of client latency.", median(lag)));
+        }
+        double[] cpu = values(trials, "cpuUtilizationPercent");
+        double[] blocked = values(trials, "workersBlockedPercent");
+        double[] idle = values(trials, "workersIdlePercent");
+        if (cpu.length > 0) {
+            result.observation(String.format("The runner process used %.1f%% of its CPU capacity during the sustained phase (median across trials; client, server and GC together).",
+                    median(cpu)));
+        }
+        if (blocked.length > 0) {
+            result.observation(String.format("Worker-thread samples (wall clock, median across trials): %.1f%% inside a request but not running, %.1f%% idle waiting for a request, the rest running. The trial details list the frames.",
+                    median(blocked), median(idle)));
         }
         if (client.getTotalCount() < 1_000) {
             result.observation("Fewer than 1 000 measured requests across trials: p99.9 is not resolvable and equals the maximum.");

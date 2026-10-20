@@ -281,6 +281,21 @@ export interface HttpLoadTrial {
   measureStartMs: number
   measureEndMs: number
   series: LoadSeriesPoint[]
+  /** wall-clock samples of the pool's worker threads during the sustained phase (profiled platform-thread pools only) */
+  workerThreads?: WorkerThreadProfile
+}
+
+export interface WorkerThreadProfile {
+  samples: number
+  threadSamples: number
+  periodMs: number
+  /** inside a request but not running (sleeping, parked, blocked) */
+  blockedShare: number
+  /** idle in the pool, waiting for a request */
+  idleShare: number
+  /** state → share of worker samples */
+  states: Record<string, number>
+  topFrames: { frame: string; share: number }[]
 }
 
 export type LatencyKind = 'client' | 'uncorrected' | 'service' | 'queueWait'
@@ -386,7 +401,7 @@ export interface WarmupCompilation { method: string; level: number; osr: boolean
 export interface WarmupTrialSeries { trial: number; invocationNanos: number[]; compilations: WarmupCompilation[]; deoptimizations: JfrDeoptimization[] }
 
 export interface JvmDetails {
-  kind: 'warmup' | 'allocation' | 'contention'
+  kind: 'warmup' | 'allocation' | 'contention' | 'profile'
   jitMode: { variantFlags: string[]; compiler: string | null; jvmArguments: string[] }
   warmup?: { invocations: number; workSize: number; trials: WarmupTrialSeries[] }
   allocation?: { mode: string; size: number; opsPerTrial: number; exactAllocatedBytes: number; reference: Record<string, unknown> }

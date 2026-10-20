@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { CartesianGrid, Legend, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
-import type { HttpLoadDetails, HttpLoadTrial, LatencyKind, LatencySummary, LoadSeriesPoint } from '../lib/api'
+import type { HttpLoadDetails, HttpLoadTrial, LatencyKind, LatencySummary, LoadSeriesPoint, WorkerThreadProfile } from '../lib/api'
 import { fmt } from '../lib/format'
 import { cx } from './ui'
 
@@ -190,11 +190,52 @@ export function HttpLoadView({ details }: { details: HttpLoadDetails }) {
           </div>
           <LatencyOverTime trial={trial} />
           <RateOverTime trial={trial} windowMs={c.windowMs} />
+          {trial.workerThreads && <WorkerThreads profile={trial.workerThreads} workers={details.workers} />}
         </div>
       )}
 
       <PercentileSpectrum details={details} />
     </section>
+  )
+}
+
+/** What the pool's worker threads were doing, sampled on the wall clock (so waiting threads count too). */
+export function WorkerThreads({ profile, workers }: { profile: WorkerThreadProfile; workers: number }) {
+  const states = Object.entries(profile.states)
+  return (
+    <div className="grid gap-4 rounded-md border border-border p-3 md:grid-cols-2">
+      <div>
+        <h5 className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted">Worker thread states</h5>
+        <p className="mb-2 text-[12px] text-muted">
+          {fmt(profile.threadSamples)} samples of {workers} workers, every {fmt(profile.periodMs)} ms during the sustained phase. Unlike CPU samples,
+          these include threads that are waiting. <b className="text-text">{(100 * profile.blockedShare).toFixed(1)}%</b> blocked inside a request,{' '}
+          <b className="text-text">{(100 * profile.idleShare).toFixed(1)}%</b> idle waiting for one.
+        </p>
+        <ul className="flex flex-col gap-1">
+          {states.map(([s, share]) => (
+            <li key={s} className="grid grid-cols-[8.5rem_1fr_3.5rem] items-center gap-2 text-[12.5px]">
+              <span className="num text-dim">{s}</span>
+              <span className="h-2 rounded bg-panel-2"><span className="block h-2 rounded" style={{ width: `${100 * share}%`, background: s === 'RUNNABLE' ? 'var(--series-1)' : 'var(--series-2)' }} /></span>
+              <span className="num text-right">{(100 * share).toFixed(1)}%</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div>
+        <h5 className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted">Where they were</h5>
+        <table className="w-full text-[12.5px]">
+          <caption className="sr-only">Most frequent top frames of worker threads</caption>
+          <tbody>
+            {profile.topFrames.map((f) => (
+              <tr key={f.frame} className="border-t border-border first:border-t-0">
+                <td className="num py-1 pr-2 text-dim">{f.frame}</td>
+                <td className="num py-1 text-right">{(100 * f.share).toFixed(1)}%</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   )
 }
 

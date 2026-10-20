@@ -80,6 +80,12 @@ const DEMOS: Record<string, { title: string; question: string; hypothesis: strin
     hypothesis: '',
     tags: ['demo', 'concurrency'],
   },
+  mystery: {
+    title: 'The Performance Mystery',
+    question: 'Throughput stops at well under the offered rate while the CPUs are mostly idle. What is the service waiting for, and which change raises the plateau without simply adding threads?',
+    hypothesis: '',
+    tags: ['demo', 'performance'],
+  },
   pagination: {
     title: 'The Query That Wouldn’t Scale',
     question: 'Why does a deep page of the transaction feed get slower with OFFSET, and does a keyset cursor keep it flat?',

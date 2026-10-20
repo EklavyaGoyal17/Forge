@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
-import { HttpLoadView, ninesX, rateSeries, spectrumRows } from '../components/HttpLoadView'
+import { HttpLoadView, WorkerThreads, ninesX, rateSeries, spectrumRows } from '../components/HttpLoadView'
 import type { HttpLoadDetails, HttpLoadTrial, LatencySummary } from '../lib/api'
 
 
@@ -121,5 +121,19 @@ describe('HttpLoadView', () => {
   it('labels virtual threads as having no pool', () => {
     render(<HttpLoadView details={{ ...details, workers: 0 }} />)
     expect(screen.getByText(/virtual threads \(no pool\)/)).toBeInTheDocument()
+  })
+})
+
+describe('WorkerThreads', () => {
+  it('shows worker states and the frames waiting threads were in', () => {
+    render(<WorkerThreads workers={4} profile={{
+      samples: 300, threadSamples: 1200, periodMs: 10, blockedShare: 0.93, idleShare: 0,
+      states: { TIMED_WAITING: 0.93, RUNNABLE: 0.07 },
+      topFrames: [{ frame: 'Thread.sleep ← TargetService$Call.blockingDownstreamCall', share: 0.93 }, { frame: 'CpuWork.spin ← TargetService$Call.cpuWork', share: 0.07 }],
+    }} />)
+    expect(screen.getByText('TIMED_WAITING')).toBeInTheDocument()
+    expect(screen.getAllByText('93.0%')).toHaveLength(3)
+    expect(screen.getByText('Thread.sleep ← TargetService$Call.blockingDownstreamCall')).toBeInTheDocument()
+    expect(screen.getByText(/1,200 samples of 4 workers, every 10 ms/)).toBeInTheDocument()
   })
 })
