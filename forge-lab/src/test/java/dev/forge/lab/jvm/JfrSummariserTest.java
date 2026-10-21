@@ -32,6 +32,7 @@ class JfrSummariserTest {
 
     /** Kept reachable so the allocation loop cannot be removed. */
     static volatile Object sink;
+    static volatile long sinkLong;
 
     static final class Monitor {
     }
@@ -92,12 +93,22 @@ class JfrSummariserTest {
         return n;
     }
 
+    /**
+     * Arithmetic in batches, reading the clock only between them. Reading it every iteration put most
+     * of the time inside the clock code, where the sampler cannot walk the Java stack and drops the
+     * sample (CI, JDK 21: 8 samples in over 5 s, none in this method).
+     */
     static long spin(long millis) {
         long end = System.nanoTime() + millis * 1_000_000;
-        long x = 0;
-        while (System.nanoTime() < end) {
-            x += Long.numberOfTrailingZeros(x + 1);
-        }
+        long x = 0x9E3779B97F4A7C15L;
+        do {
+            for (int i = 0; i < 1_000_000; i++) {
+                x ^= x << 13;
+                x ^= x >>> 7;
+                x ^= x << 17;
+            }
+        } while (System.nanoTime() < end);
+        sinkLong = x;
         return x;
     }
 
