@@ -1,5 +1,6 @@
 package dev.forge.server.run;
 
+import dev.forge.lab.runner.ChildJvm;
 import dev.forge.lab.runner.RunnerMain;
 import dev.forge.lab.scenario.RunSpec;
 import dev.forge.lab.scenario.ScenarioCatalog;
@@ -15,51 +16,39 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.io.OutputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
-import java.util.Comparator;
+import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
-import java.util.stream.Stream;
 
 /**
- * Starts the runner in a separate JVM and supervises it.
- *
- * <p>Isolation controls applied here (see docs/SECURITY.md §2):
- * <ul>
- *   <li>Arguments are passed as an array plus a JVM {@code @argfile}; no shell is ever involved.</li>
- *   <li>The child's environment is cleared; only what the JVM needs on this OS is re-added.</li>
- *   <li>Heap ceiling, OOM-exit, optional processor-count cap, private temp/working directory.</li>
- *   <li>Per-variant JVM flags (JVM Lab JIT modes) come from the compiled scenario descriptor, never
- *       from the request, and must also be on {@link #ALLOWED_VARIANT_FLAGS}.</li>
- *   <li>Wall-clock timeout, cooperative cancellation, stdout/stderr byte caps; on any of these the
- *       whole process tree is destroyed.</li>
- * </ul>
+ * Launches a run's runner JVM and supervises it — in this process ({@link ChildJvm}), or, when
+ * {@code forge.runner.agent-url} is set, through the runner agent in the dedicated runner container
+ * ({@link dev.forge.lab.runner.RunnerAgent}). Either way the same isolation controls apply; the
+ * agent applies them on its side and the server only relays the protocol.
  */
 @Component
 public class RunnerLauncher {
 
     private static final Logger log = LoggerFactory.getLogger(RunnerLauncher.class);
-    private static final boolean WINDOWS = System.getProperty("os.name", "").toLowerCase(Locale.ROOT).contains("windows");
 
-    /**
-     * The only flags a scenario variant may add to the runner command line: execution-mode switches
-     * that change how code is compiled, not what the process may access.
-     */
-    static final java.util.Set<String> ALLOWED_VARIANT_FLAGS = java.util.Set.of(
-            "-Xint", "-XX:-TieredCompilation", "-XX:TieredStopAtLevel=1");
+    /** See {@link ChildJvm#ALLOWED_VARIANT_FLAGS}. */
+    static final Set<String> ALLOWED_VARIANT_FLAGS = ChildJvm.ALLOWED_VARIANT_FLAGS;
 
     private final RunnerProperties props;
     private final Json json;
     private final Path workRoot;
+    private final HttpClient agent;
     private volatile String mainClass = RunnerMain.class.getName();
 
     public RunnerLauncher(RunnerProperties props, Json json) throws IOException {
@@ -69,12 +58,16 @@ public class RunnerLauncher {
                 ? Path.of(System.getProperty("java.io.tmpdir"), "forge-runs")
                 : Path.of(props.workRoot());
         Files.createDirectories(workRoot);
+        // HTTP/1.1: the agent is the JDK HttpServer, which mishandles the h2c upgrade on a POST with a body
+        this.agent = remote() ? HttpClient.newBuilder().version(HttpClient.Version.HTTP_1_1).proxy(HttpClient.Builder.NO_PROXY)
+                .followRedirects(HttpClient.Redirect.NEVER).connectTimeout(Duration.ofSeconds(5)).build() : null;
     }
 
     public enum Termination { EXITED, TIMED_OUT, CANCELLED, OUTPUT_LIMIT }
 
+    /** @param host facts about the machine the run executed on, when it was not this process's host (else null) */
     public record Outcome(Termination termination, int exitCode, String stderr, boolean stderrTruncated,
-                          List<String> commandLine) {
+                          List<String> commandLine, Map<String, Object> host) {
     }
 
     /** Polled while the child runs; returning true kills it. */
@@ -83,16 +76,137 @@ public class RunnerLauncher {
         boolean cancelled();
     }
 
+    public boolean remote() {
+        return props.agentUrl() != null && !props.agentUrl().isBlank();
+    }
+
     public Outcome launch(RunSpec spec, int heapMb, int timeoutSeconds, Consumer<JsonNode> onMessage,
                           CancelSignal cancel) throws IOException, InterruptedException {
+        if (remote()) {
+            return launchRemote(spec, heapMb, timeoutSeconds, onMessage, cancel);
+        }
         Path workDir = Files.createDirectories(workRoot.resolve("run-" + spec.runId()));
         try {
-            return supervise(spec, heapMb, timeoutSeconds, workDir, onMessage, cancel);
+            ChildJvm.Outcome o = ChildJvm.run(launchConfig(), spec.runId(), heapMb, timeoutSeconds, variantFlags(spec), workDir,
+                    json.write(spec).getBytes(StandardCharsets.UTF_8), line -> relay(line, onMessage), cancel::cancelled);
+            if (o.termination() != ChildJvm.Termination.EXITED) {
+                log.warn("run {}: {} — runner process tree destroyed", spec.runId(), o.termination());
+            }
+            return new Outcome(Termination.valueOf(o.termination().name()), o.exitCode(), o.stderr(), o.stderrTruncated(),
+                    o.commandLine(), null);
         } finally {
             if (!props.keepWorkDirs()) {
-                deleteRecursively(workDir);
+                ChildJvm.deleteRecursively(workDir);
             }
         }
+    }
+
+    // ------------------------------------------------------------------ remote (runner container)
+
+    private Outcome launchRemote(RunSpec spec, int heapMb, int timeoutSeconds, Consumer<JsonNode> onMessage, CancelSignal cancel)
+            throws IOException, InterruptedException {
+        String base = props.agentUrl().replaceAll("/+$", "");
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("runId", spec.runId());
+        body.put("heapMb", heapMb);
+        body.put("timeoutSeconds", timeoutSeconds);
+        body.put("spec", spec);
+        HttpRequest req = HttpRequest.newBuilder(URI.create(base + "/runs"))
+                .timeout(Duration.ofSeconds(timeoutSeconds + 120L))
+                .header("Content-Type", "application/json")
+                .header("X-Forge-Runner-Token", props.agentToken())
+                .POST(HttpRequest.BodyPublishers.ofString(json.write(body)))
+                .build();
+        HttpResponse<InputStream> resp = agent.send(req, HttpResponse.BodyHandlers.ofInputStream());
+        if (resp.statusCode() != 200) {
+            String text;
+            try (InputStream in = resp.body()) {
+                text = new String(in.readNBytes(2_000), StandardCharsets.UTF_8);
+            }
+            throw new IOException("runner agent answered HTTP " + resp.statusCode() + ": " + text);
+        }
+        AtomicBoolean done = new AtomicBoolean();
+        Thread watcher = Thread.ofPlatform().name("runner-cancel-" + spec.runId()).daemon().start(() -> {
+            while (!done.get()) {
+                if (cancel.cancelled()) {
+                    try {
+                        agent.send(HttpRequest.newBuilder(URI.create(base + "/runs/" + spec.runId() + "/cancel"))
+                                .timeout(Duration.ofSeconds(10)).header("X-Forge-Runner-Token", props.agentToken())
+                                .POST(HttpRequest.BodyPublishers.noBody()).build(), HttpResponse.BodyHandlers.discarding());
+                    } catch (IOException e) {
+                        log.warn("could not cancel run {} on the runner agent: {}", spec.runId(), e.getMessage());
+                    } catch (InterruptedException e) {
+                        return;
+                    }
+                    return;
+                }
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    return;
+                }
+            }
+        });
+        JsonNode outcome = null;
+        try (BufferedReader r = new BufferedReader(new InputStreamReader(resp.body(), StandardCharsets.UTF_8))) {
+            String line;
+            while ((line = r.readLine()) != null) {
+                if (line.isBlank()) {
+                    continue;
+                }
+                JsonNode msg;
+                try {
+                    msg = json.read(line);
+                } catch (RuntimeException e) {
+                    log.warn("runner wrote non-protocol output: {}", line.length() > 200 ? line.substring(0, 200) : line);
+                    continue;
+                }
+                if ("outcome".equals(msg.path("agent").asString(null))) {
+                    outcome = msg;
+                } else {
+                    deliver(msg, onMessage);
+                }
+            }
+        } finally {
+            done.set(true);
+            watcher.interrupt();
+        }
+        if (outcome == null) {
+            throw new IOException("the runner agent closed the connection without an outcome");
+        }
+        @SuppressWarnings("unchecked")
+        Map<String, Object> host = json.convert(outcome.get("host"), Map.class);
+        List<String> commandLine = new java.util.ArrayList<>();
+        outcome.path("commandLine").forEach(a -> commandLine.add(a.asString()));
+        return new Outcome(Termination.valueOf(outcome.path("termination").asString("EXITED")), outcome.path("exitCode").asInt(-1),
+                outcome.path("stderr").asString(""), outcome.path("stderrTruncated").asBoolean(), commandLine, host);
+    }
+
+    // ------------------------------------------------------------------ shared
+
+    private void relay(String line, Consumer<JsonNode> onMessage) {
+        JsonNode message;
+        try {
+            message = json.read(line);
+        } catch (RuntimeException e) {
+            // System.out is redirected in the runner, so this indicates a protocol fault
+            log.warn("runner wrote non-protocol output: {}", line.length() > 200 ? line.substring(0, 200) : line);
+            return;
+        }
+        deliver(message, onMessage);
+    }
+
+    private static void deliver(JsonNode message, Consumer<JsonNode> onMessage) {
+        try {
+            onMessage.accept(message);
+        } catch (RuntimeException e) {
+            log.error("failed to handle runner message", e);
+        }
+    }
+
+    ChildJvm.Launch launchConfig() {
+        return new ChildJvm.Launch(javaExecutable(), classpath(), mainClass, props.activeProcessorCount(),
+                props.stdoutCapBytes(), props.stderrCapBytes());
     }
 
     List<String> jvmArguments(int heapMb, int timeoutSeconds, Path workDir) {
@@ -100,24 +214,7 @@ public class RunnerLauncher {
     }
 
     List<String> jvmArguments(int heapMb, int timeoutSeconds, Path workDir, List<String> variantFlags) {
-        List<String> args = new ArrayList<>();
-        args.add("-Xms" + Math.min(heapMb, 64) + "m");
-        args.add("-Xmx" + heapMb + "m");
-        args.add("-XX:+ExitOnOutOfMemoryError");
-        args.add("-XX:-UsePerfData");           // no hsperfdata files outside the work dir
-        if (props.activeProcessorCount() > 0) {
-            args.add("-XX:ActiveProcessorCount=" + props.activeProcessorCount());
-        }
-        args.addAll(vetVariantFlags(variantFlags));
-        args.add("-Djava.io.tmpdir=" + workDir);
-        args.add("-Dforge.workDir=" + workDir);
-        args.add("-Dforge.timeoutMillis=" + timeoutSeconds * 1000L);
-        args.add("-Dfile.encoding=UTF-8");
-        args.add("-Dstdout.encoding=UTF-8");
-        args.add("-cp");
-        args.add(classpath());
-        args.add(mainClass);
-        return args;
+        return ChildJvm.jvmArguments(launchConfig(), heapMb, timeoutSeconds, workDir, variantFlags);
     }
 
     /** The JVM flags the run's variant declares in its descriptor (empty for almost every scenario). */
@@ -129,12 +226,7 @@ public class RunnerLauncher {
     }
 
     static List<String> vetVariantFlags(List<String> flags) {
-        for (String f : flags) {
-            if (!ALLOWED_VARIANT_FLAGS.contains(f)) {
-                throw new IllegalStateException("variant JVM flag not on the allow-list: " + f);
-            }
-        }
-        return flags;
+        return ChildJvm.vetVariantFlags(flags);
     }
 
     /** Tests substitute a deliberately misbehaving main class to exercise the kill paths. */
@@ -142,133 +234,11 @@ public class RunnerLauncher {
         this.mainClass = className;
     }
 
-    private Outcome supervise(RunSpec spec, int heapMb, int timeoutSeconds, Path workDir,
-                              Consumer<JsonNode> onMessage, CancelSignal cancel) throws IOException, InterruptedException {
-        List<String> jvmArgs = jvmArguments(heapMb, timeoutSeconds, workDir, variantFlags(spec));
-        // An @argfile avoids the ~32k command-line limit on Windows for long development classpaths.
-        Path argFile = workDir.resolve("jvm.args");
-        Files.writeString(argFile, String.join("\n", jvmArgs.stream().map(RunnerLauncher::quoteArg).toList()),
-                StandardCharsets.UTF_8);
-
-        ProcessBuilder pb = new ProcessBuilder(javaExecutable(), "@" + argFile);
-        pb.directory(workDir.toFile());
-        Map<String, String> env = pb.environment();
-        env.clear();
-        env.putAll(minimalEnvironment(workDir));
-
-        Process process = pb.start();
-        log.info("run {} started runner pid {}", spec.runId(), process.pid());
-        try (OutputStream stdin = process.getOutputStream()) {
-            stdin.write(json.write(spec).getBytes(StandardCharsets.UTF_8));
-        }
-
-        AtomicBoolean outputLimit = new AtomicBoolean();
-        StderrCollector stderr = new StderrCollector(process.getErrorStream(), props.stderrCapBytes());
-        Thread stdoutThread = Thread.ofPlatform().name("runner-stdout-" + spec.runId()).daemon().start(
-                () -> readProtocol(process, onMessage, outputLimit));
-        Thread stderrThread = Thread.ofPlatform().name("runner-stderr-" + spec.runId()).daemon().start(stderr);
-
-        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds);
-        Termination termination = Termination.EXITED;
-        while (!process.waitFor(200, TimeUnit.MILLISECONDS)) {
-            if (outputLimit.get()) {
-                termination = Termination.OUTPUT_LIMIT;
-                break;
-            }
-            if (cancel.cancelled()) {
-                termination = Termination.CANCELLED;
-                break;
-            }
-            if (System.nanoTime() - deadline > 0) {
-                termination = Termination.TIMED_OUT;
-                break;
-            }
-        }
-        if (termination != Termination.EXITED) {
-            log.warn("run {}: {} — destroying runner process tree", spec.runId(), termination);
-            destroyTree(process);
-        }
-        stdoutThread.join(5_000);
-        stderrThread.join(5_000);
-        int exit = process.isAlive() ? -1 : process.exitValue();
-        if (outputLimit.get()) {
-            termination = Termination.OUTPUT_LIMIT;
-        }
-        return new Outcome(termination, exit, stderr.text(), stderr.truncated(), jvmArgs);
-    }
-
-    private void readProtocol(Process process, Consumer<JsonNode> onMessage, AtomicBoolean outputLimit) {
-        AtomicLong bytes = new AtomicLong();
-        try (BufferedReader r = new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8))) {
-            String line;
-            while ((line = r.readLine()) != null) {
-                if (bytes.addAndGet(line.length() + 1L) > props.stdoutCapBytes()) {
-                    outputLimit.set(true);
-                    return;
-                }
-                if (line.isBlank()) {
-                    continue;
-                }
-                JsonNode message;
-                try {
-                    message = json.read(line);
-                } catch (RuntimeException e) {
-                    // System.out is redirected in the runner, so this indicates a protocol fault
-                    log.warn("runner wrote non-protocol output: {}", line.length() > 200 ? line.substring(0, 200) : line);
-                    continue;
-                }
-                try {
-                    onMessage.accept(message);
-                } catch (RuntimeException e) {
-                    log.error("failed to handle runner message", e);
-                }
-            }
-        } catch (IOException e) {
-            log.debug("runner stdout closed: {}", e.getMessage());
-        }
-    }
-
-    static void destroyTree(Process process) {
-        List<ProcessHandle> descendants = process.descendants().toList();
-        descendants.forEach(ProcessHandle::destroy);
-        process.destroy();
-        try {
-            if (!process.waitFor(2, TimeUnit.SECONDS)) {
-                process.destroyForcibly();
-                process.waitFor(5, TimeUnit.SECONDS);
-            }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-        descendants.stream().filter(ProcessHandle::isAlive).forEach(ProcessHandle::destroyForcibly);
-    }
-
-    private Map<String, String> minimalEnvironment(Path workDir) {
-        Path javaBin = Path.of(javaExecutable()).getParent();
-        Map<String, String> env = new java.util.HashMap<>();
-        if (javaBin != null) {
-            env.put(WINDOWS ? "Path" : "PATH", javaBin.toString());
-        }
-        if (WINDOWS) {
-            // Required by the JVM and Winsock (JMH talks to its forks over loopback).
-            String systemRoot = System.getenv("SystemRoot");
-            if (systemRoot != null) {
-                env.put("SystemRoot", systemRoot);
-            }
-            env.put("TEMP", workDir.toString());
-            env.put("TMP", workDir.toString());
-        } else {
-            env.put("TMPDIR", workDir.toString());
-            env.put("LANG", "C.UTF-8");
-        }
-        return env;
-    }
-
     String javaExecutable() {
         if (props.javaExecutable() != null && !props.javaExecutable().isBlank()) {
             return props.javaExecutable();
         }
-        return Path.of(System.getProperty("java.home"), "bin", WINDOWS ? "java.exe" : "java").toString();
+        return ChildJvm.defaultJavaExecutable();
     }
 
     String classpath() {
@@ -278,66 +248,7 @@ public class RunnerLauncher {
         return System.getProperty("java.class.path");
     }
 
-    /** Quotes one argument for a JVM @argfile: backslash and double quote are escape characters. */
     static String quoteArg(String arg) {
-        return "\"" + arg.replace("\\", "\\\\").replace("\"", "\\\"") + "\"";
-    }
-
-    private static void deleteRecursively(Path dir) {
-        try (Stream<Path> paths = Files.walk(dir)) {
-            paths.sorted(Comparator.reverseOrder()).forEach(p -> {
-                try {
-                    Files.deleteIfExists(p);
-                } catch (IOException e) {
-                    log.debug("could not delete {}: {}", p, e.getMessage());
-                }
-            });
-        } catch (IOException e) {
-            log.debug("could not clean {}: {}", dir, e.getMessage());
-        }
-    }
-
-    /** Keeps the first {@code cap} bytes of stderr and discards (but drains) the rest. */
-    static final class StderrCollector implements Runnable {
-        private final InputStream in;
-        private final int cap;
-        private final java.io.ByteArrayOutputStream buf = new java.io.ByteArrayOutputStream();
-        private volatile boolean truncated;
-
-        StderrCollector(InputStream in, int cap) {
-            this.in = in;
-            this.cap = cap;
-        }
-
-        @Override
-        public void run() {
-            byte[] chunk = new byte[8192];
-            try (in) {
-                int n;
-                while ((n = in.read(chunk)) != -1) {
-                    synchronized (buf) {
-                        int room = cap - buf.size();
-                        if (room > 0) {
-                            buf.write(chunk, 0, Math.min(room, n));
-                        }
-                        if (n > room) {
-                            truncated = true;
-                        }
-                    }
-                }
-            } catch (IOException ignored) {
-                // process ended
-            }
-        }
-
-        String text() {
-            synchronized (buf) {
-                return buf.toString(StandardCharsets.UTF_8);
-            }
-        }
-
-        boolean truncated() {
-            return truncated;
-        }
+        return ChildJvm.quoteArg(arg);
     }
 }

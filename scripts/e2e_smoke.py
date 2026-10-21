@@ -5,7 +5,10 @@ Runs one short, real run of every registered scenario through the HTTP API and c
 succeeds, then checks the UI, the AI investigator (rule-based) and the Challenge Arena endpoints.
 Python standard library only. Exits non-zero on the first category of failure, after reporting all.
 
-    python scripts/e2e_smoke.py http://127.0.0.1:8090
+    python scripts/e2e_smoke.py http://127.0.0.1:8090 [--expect-runner-container]
+
+With --expect-runner-container, every run must report that it executed in the dedicated runner
+container (the compose deployment), not in the server process.
 """
 import json
 import sys
@@ -13,7 +16,9 @@ import time
 import urllib.error
 import urllib.request
 
-BASE = (sys.argv[1] if len(sys.argv) > 1 else "http://127.0.0.1:8090").rstrip("/")
+ARGS = [a for a in sys.argv[1:] if not a.startswith("--")]
+BASE = (ARGS[0] if ARGS else "http://127.0.0.1:8090").rstrip("/")
+EXPECT_RUNNER_CONTAINER = "--expect-runner-container" in sys.argv
 DEADLINE_S = 240
 
 # One fast, representative run per scenario. Parameters are clamped to each descriptor's bounds,
@@ -29,6 +34,8 @@ RUNS = {
     "concurrency.starvation": [("ticket", {"mode": "explore"}, 1, 0)],
     "algorithms.lookup": [("hash-set", {"size": 100, "iterationMs": 100, "forks": 1}, 1, 1)],
     "performance.thread-pool-starvation": [("async", {"rate": 100, "warmupMs": 200, "durationMs": 500}, 1, 0)],
+    "performance.generator-crosscheck": [("forge", {"rate": 100, "warmupMs": 200, "durationMs": 1000}, 1, 0),
+                                         ("k6", {"rate": 100, "warmupMs": 0, "durationMs": 1000}, 1, 0)],
     "database.index-lookup": [("covering-index", {"rows": 10000, "accounts": 100, "queriesPerTrial": 10}, 1, 0)],
     "database.pagination": [("keyset", {"rows": 10000, "page": 10, "pagesPerTrial": 5}, 1, 0)],
     "database.n-plus-one": [("batched", {"rows": 10000, "accounts": 10, "loadsPerTrial": 3}, 1, 0)],
@@ -103,9 +110,12 @@ def main():
                 break
             time.sleep(1)
         ok = run["status"] == "SUCCEEDED"
-        print(f"{'ok  ' if ok else 'FAIL'} {sid:38s} {variant:22s} {run['status']}" + ("" if ok else f" — {run.get('statusReason')}"))
+        executor = ((run.get("environment") or {}).get("launch") or {}).get("executor", "?")
+        print(f"{'ok  ' if ok else 'FAIL'} {sid:38s} {variant:22s} {run['status']:10s} [{executor}]" + ("" if ok else f" — {run.get('statusReason')}"))
         if not ok:
             failures.append(f"{sid}/{variant}: {run['status']} {run.get('statusReason')}")
+        elif EXPECT_RUNNER_CONTAINER and "runner container" not in executor:
+            failures.append(f"{sid}/{variant}: executed in '{executor}', expected the runner container")
 
     # UI: the SPA and one hashed asset are served by the server
     status, ctype, html = call("GET", "/", raw=True)

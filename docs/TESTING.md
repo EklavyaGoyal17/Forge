@@ -8,7 +8,8 @@ FORGE's tests are organised by what could go wrong, not by layer. Everything bel
 End to end, against a running stack (`docker compose up -d --build --wait`):
 
 ```bash
-python3 scripts/e2e_smoke.py http://127.0.0.1:8090
+bash scripts/verify_isolation.sh                                         # container hardening + runner network isolation
+python3 scripts/e2e_smoke.py http://127.0.0.1:8090 --expect-runner-container
 ```
 
 Unit and integration tests:
@@ -178,6 +179,31 @@ Uses deliberately misbehaving "runners" (`MisbehavingRunners`):
 * Per-variant JVM flags: a JIT-mode variant adds its declared flag before `-cp`, other variants add
   none, flags outside the allow-list (`-XX:+UnlockDiagnosticVMOptions`, `-javaagent:…`) are refused,
   and every flag declared anywhere in the catalog is on the allow-list.
+
+### Runner agent (`forge-server/.../run/RunnerAgentTest`)
+Starts a real `RunnerAgent` on loopback and drives it through `RunnerLauncher` in remote mode:
+* a real run succeeds through the agent, with the agent's host facts in the outcome, the requested
+  `-Xmx` on the child's command line, and the work directory deleted afterwards;
+* timeout with a grandchild (both dead), cancellation from the server side, and the stdout cap all
+  behave as in local mode;
+* refusals: no token or a wrong token → 401; heap above the agent's ceiling, a run id like `../etc`,
+  or a timeout above its ceiling → 400; `/health` answers without a token;
+* a launcher configured with an agent URL but no token (or a short one) fails at start-up.
+
+### Network isolation (`scripts/verify_isolation.sh`, CI job "Hardened container, end to end")
+Against the running compose stack: both FORGE containers read-only, unprivileged, all capabilities
+dropped, `no-new-privileges`, non-root, pids and memory limits, seccomp in filter mode; from inside
+the runner, lab-postgres resolves and accepts a TCP connection, `postgres` and `example.com` do not
+resolve, `http://1.1.1.1/` is unreachable, and the server's API answers 403; from the host it answers 200.
+
+### Load generator cross-check (`forge-lab/.../performance/GeneratorCrossCheckTest`)
+The generated k6 script is a constant-arrival-rate load against exactly one loopback URL, with and
+without a warm-up stage; the measured phase is read from a k6 summary (percentiles, dropped
+iterations as a share of scheduled ones, error rate); the FORGE variant reports both latency
+definitions and the server's service time; a warm-up between 0 and 1 s is refused for k6; without
+the binary the variant fails with an explanation instead of numbers. The k6 end-to-end test is
+skipped where k6 is not installed (the developer machine); it runs in the container through the e2e
+smoke.
 
 ### End-to-end (`forge-server/.../ExperimentFlowIntegrationTest`, Testcontainers PostgreSQL 17)
 HTTP API → Flyway schema → DB-backed queue → isolated runner JVM → stored results → comparison →

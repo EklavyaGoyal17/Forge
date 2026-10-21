@@ -1,5 +1,9 @@
 # syntax=docker/dockerfile:1
-# One image: Spring Boot API + built UI + the shaded runner jar (the only code runner JVMs load).
+# One image for both services: the Spring Boot API + built UI, and the shaded runner jar (the only
+# code runner JVMs load), which also contains the runner agent the runner container starts.
+
+# k6 for the load-generator cross-check: the static binary from Grafana's official image, pinned by digest.
+FROM grafana/k6:1.0.0@sha256:f21270290d702cbf0a7d6ba5d7ed100b63bcb233b558b885ed787547b3488279 AS k6
 
 FROM node:22-alpine AS ui
 WORKDIR /ui
@@ -24,6 +28,7 @@ WORKDIR /app
 COPY --from=build /src/forge-server/target/forge-server.jar /app/forge-server.jar
 COPY --from=build /src/forge-lab/target/forge-lab-*-runner.jar /app/forge-runner.jar
 COPY --from=ui /ui/dist /app/ui
+COPY --from=k6 /usr/bin/k6 /usr/bin/k6
 USER forge
 ENV FORGE_RUNNER_CLASSPATH=/app/forge-runner.jar \
     FORGE_RUNNER_WORK_ROOT=/tmp/forge-runs \

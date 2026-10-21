@@ -21,7 +21,9 @@ public record RunnerProperties(
         int stderrCapBytes,
         int artifactCapBytes,
         int maxArtifactsPerRun,
-        boolean keepWorkDirs) {
+        boolean keepWorkDirs,
+        String agentUrl,
+        String agentToken) {
 
     public RunnerProperties {
         if (maxConcurrentRuns < 1) {
@@ -29,6 +31,9 @@ public record RunnerProperties(
         }
         if (defaultHeapMb < 32 || defaultHeapMb > maxHeapMb) {
             throw new IllegalArgumentException("forge.runner.default-heap-mb must be in [32, max-heap-mb]");
+        }
+        if (agentUrl != null && !agentUrl.isBlank() && (agentToken == null || agentToken.length() < 16)) {
+            throw new IllegalArgumentException("forge.runner.agent-url needs forge.runner.agent-token (at least 16 characters)");
         }
     }
 }

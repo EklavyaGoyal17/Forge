@@ -7,14 +7,14 @@ or a recorded manual check. Status values: `done`, `in progress`, `not started`.
 |---|---|---|
 | 0 | Architecture & documentation | done |
 | 1 | Working experiment platform | done |
-| 2 | Performance lab (HTTP) | done except the k6 adapter (deferred by design, see below) |
+| 2 | Performance lab (HTTP) | done |
 | 3 | Concurrency lab | done |
 | 4 | Database studio | done |
 | 5 | JVM lab | done |
 | 6 | Failure lab | done |
 | 7 | AI investigator | done (no real-API call verified; see below) |
 | 8 | Challenge arena | done |
-| 9 | Hardening | done except the dedicated runner container (see below) |
+| 9 | Hardening | done (residual risks in SECURITY.md §3) |
 
 `[x]` = implemented and verified by an automated test or a recorded check; `[~]` = implemented but not
 fully verified; `[ ]` = not done.
@@ -39,7 +39,7 @@ fully verified; `[ ]` = not done.
 - [x] Embedded loopback target service with configurable CPU work, blocking I/O, and worker-pool size. *(bound to 127.0.0.1 on an ephemeral port inside the runner JVM, checked at start-up; four designs: small blocking pool, 8× pool, non-blocking downstream, virtual threads)*
 - [x] Client-observed latency vs server-side service time vs queue wait reported separately. *(plus worker time per request and the Little's-law capacity it implies)*
 - [x] Warm-up and sustained phases, repeated trials, p50/p90/p95/p99, error rate. *(`PerformanceScenarioTest` checks structure and request accounting. Recorded end-to-end check on 2026-10-19 through the API on the development machine: at 300 req/s, 4 workers and a 20 ms downstream, the blocking pool completed a median of 188 req/s against a Little's-law bound of 188 req/s, and its p99 reached the 2 s timeout while a send-time measurement reported 346 ms; the non-blocking design completed 300 req/s with p99 24.5 ms)*
-- [ ] k6 adapter (`grafana/k6` container) against the same target when Docker is available. *(deferred by design: a `grafana/k6` container would need Docker access from the runner (the runner has an empty environment and no Docker socket — see SECURITY.md) and, on Docker Desktop, a target bound beyond 127.0.0.1 so the container can reach it. Both weaken the isolation model; revisit together with the dedicated runner container in Phase 9)*
+- [x] k6 cross-check (`performance.generator-crosscheck`): the same embedded target driven by FORGE's generator or by k6 v1.0.0 (constant-arrival-rate, a static binary in the image, given only the loopback URL). *(`GeneratorCrossCheckTest`: script, summary parsing, warm-up refusal, missing-binary message, end-to-end where k6 is installed; e2e smoke runs both variants in the container. Recorded 2026-10-21, runner container, defaults (300 req/s, 4 workers, 20 ms downstream), 3 trials each: healthy async target — FORGE p50/p99 21.68/23.62 ms, k6 21.14/22.88 ms, server service p99 21.54 vs 21.95 ms; overloaded blocking pool — FORGE p99 2,000.9 ms from intended send (343.8 ms from actual send), 17.78% timeouts, 0% unsent; k6 p99 443.6 ms, 0% errors, **36.78% of iterations dropped** and 569 vs 843 requests served. The generators agree on a healthy service; under overload k6 reports the waiting as dropped iterations instead of latency. Earlier deferral reason — a `grafana/k6` container would need the Docker socket — was avoided by copying the binary into the runner image)*
 - [x] Regression detection against a pinned baseline. *(pin a succeeded run per experiment; every other succeeded run is gated: REGRESSION only when comparable — same parameters, scenario version, environment — and the primary metric's bootstrap CI excludes 1.0 on the worse side, or when an invariant the baseline held is violated. `RegressionGateTest` covers the rules; `ExperimentFlowIntegrationTest.pinnedBaselineGatesEveryOtherRun` covers pin/unpin, NOT_COMPARABLE on a parameter change, the report section and deletion of a pinned experiment)*
 
 ## Phase 3 — Concurrency lab
@@ -93,4 +93,4 @@ Recorded end-to-end check (2026-10-19, development machine: i7-12650H, 16 logica
 - [x] Accessibility: axe-core (WCAG 2.1 A/AA) over the shell and the main evidence views, with a test that proves it detects planted violations; WCAG contrast of every text token on every surface in both themes, which found and fixed five failing tokens (light accent was 3.38:1). Not done: a manual screen-reader pass.
 - [x] Demo Three, The Performance Mystery: JFR, CPU utilisation and wall-clock worker-thread sampling in the HTTP scenario (v3). Recorded (2026-10-21, container, 4 CPUs, defaults): blocking pool 189.7 of 300 req/s, p99 2,000.9 ms (timeout), workers 96.7% blocked in `Thread.sleep ← blockingDownstreamCall`, 0% idle, process CPU 19.0%, while JFR's on-CPU samples rank `CpuWork.spin` first (77%) — a CPU profile alone points at the wrong thing. Non-blocking downstream, same 4 workers: 300 req/s, p99 23.5 ms, workers 95.3% idle. Virtual threads: 300 req/s, p99 23.3 ms.
 - [x] CI failures found and fixed: a JFR test that assumed CPU samples within 300 ms (0 samples on JDK 21 in a container); a UI test environment without `scrollIntoView`.
-- [ ] Dedicated runner container without a database route. Runner JVMs still share the server container's network namespace (residual risk 2 in SECURITY.md); they receive no platform credentials, and the lab role cannot connect to the platform database. Doing this properly needs a runner service in its own container or Docker access from the server, which is itself a risk — left as a documented design decision rather than a half-measure.
+- [x] Dedicated runner container (ADR-016). Runs execute in a `runner` container behind a token-authenticated agent, on an internal network shared only with the server and a disposable `lab-postgres` (tmpfs); the API refuses requests from the runner. *(`RunnerAgentTest`: a real run through the agent, timeout with grandchild kill, cancellation, output cap, token and parameter refusals; `scripts/verify_isolation.sh` in CI: both containers hardened, runner reaches lab-postgres but cannot resolve `postgres` or the internet, API answers it 403; e2e smoke asserts every run reports `executor: runner container (agent)` — 19 of 19 on 2026-10-21. Remaining exposure: SECURITY.md §3 item 2)*

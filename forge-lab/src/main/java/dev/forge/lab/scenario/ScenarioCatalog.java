@@ -15,6 +15,7 @@ import dev.forge.lab.scenarios.concurrency.VisibilityScenario;
 import dev.forge.lab.scenarios.jvm.AllocationScenario;
 import dev.forge.lab.scenarios.jvm.LockContentionScenario;
 import dev.forge.lab.scenarios.jvm.WarmupScenario;
+import dev.forge.lab.scenarios.performance.GeneratorCrossCheckScenario;
 import dev.forge.lab.scenarios.performance.ThreadPoolStarvationScenario;
 
 import java.util.LinkedHashMap;
@@ -39,6 +40,7 @@ public final class ScenarioCatalog {
         register(new StarvationScenario());
         register(new LookupScenario());
         register(new ThreadPoolStarvationScenario());
+        register(new GeneratorCrossCheckScenario());
         register(new IndexLookupScenario());
         register(new PaginationScenario());
         register(new NPlusOneScenario());

@@ -25,7 +25,7 @@ class LabDatabaseServiceTest {
     @Container
     static PostgreSQLContainer postgres = new PostgreSQLContainer("postgres:17-alpine");
 
-    private static final LabDatabaseProperties PROPS = new LabDatabaseProperties(true, "forge_lab", "forge_lab_runner", 8, 60, 10);
+    private static final LabDatabaseProperties PROPS = new LabDatabaseProperties(true, "forge_lab", "forge_lab_runner", 8, 60, 10, null, null, null);
 
     private static LabDatabaseService service() {
         PGSimpleDataSource ds = new PGSimpleDataSource();

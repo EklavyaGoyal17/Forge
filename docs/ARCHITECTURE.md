@@ -39,6 +39,10 @@
                                                            └───────────────────────────┘
 ```
 
+The diagram shows a development run (`mvn spring-boot:run`): the child JVM is a child of the server.
+In the compose deployment `RunnerLauncher` instead streams the same `RunSpec` to `RunnerAgent` in a
+separate `runner` container, which launches the child JVM there with the same controls (ADR-016).
+
 ### Maven modules
 
 | Module | Responsibility | Depends on |
@@ -130,7 +134,7 @@
   capacity bound shown next to the achieved throughput.
 * **Trade-off:** client and server share one JVM, CPU and GC; the generator relies on OS timers
   (its wake-up lag is reported per trial). Both are stated as caveats on every result.
-* **Not yet:** a k6 adapter (`grafana/k6`); deferred by design: a `grafana/k6` container would need Docker access from the runner (the runner has an empty environment and no Docker socket — see SECURITY.md) and, on Docker Desktop, a target bound beyond 127.0.0.1 so the container can reach it. Both weaken the isolation model; revisit together with the dedicated runner container in Phase 9.
+* **Cross-check with k6** (`performance.generator-crosscheck`): the same target and plan driven by k6 v1.0.0's `constant-arrival-rate` executor. k6 is a static binary copied into the image (pinned by digest), so no Docker socket or non-loopback target is needed; the scenario writes the script, runs `k6 run` as a child process with an empty environment, and reads the measured phase from `handleSummary`. It answers "is FORGE's generator right?" with a second, independent implementation. The two differ by design under overload: FORGE measures from the intended send time and waits; k6 measures from the actual send and **drops** iterations it has no VU for, so its latency looks better while its dropped-iterations count carries the overload (ROADMAP Phase 2 has the recorded comparison). k6 stages need ≥ 1 s, so a shorter warm-up is refused rather than silently changed.
 
 ### ADR-010 — Database Studio: a separate lab database, a restricted role, a schema per run (implemented)
 * **Decision:** Database Studio scenarios run against a separate database (`forge_lab`) on the same
@@ -230,8 +234,8 @@ per-window timeline (success by completion time, latency by intended time, attem
 backlog, breaker state) is the evidence; recovery time is computed from it with stated thresholds.
 
 Alternatives considered: a TCP fault-injecting proxy (Toxiproxy) in a container — rejected for
-now because it needs Docker access from the runner and a network path out of it (the same reason the
-k6 adapter is deferred); faults inside the target give the same client-side behaviour for HTTP.
+now because it needs Docker access from the runner and a network path out of it (the reason k6 runs as a
+binary inside the runner rather than as a `grafana/k6` container); faults inside the target give the same client-side behaviour for HTTP.
 Using Resilience4j — rejected for the lab (opaque in a teaching view); production code should use it.
 
 ### ADR-014 — AI Investigator: evidence bundle, rules first, model optional and checked (implemented)
@@ -280,6 +284,33 @@ FORGE's container it is 1.6–3.7× *slower* at every hit rate, so that criterio
 met. It now requires decisive comparisons (95% interval excluding 1, either direction) at a small size,
 a large size and two hit rates, and reports which way each went.
 
+### ADR-016 — Runs execute in a runner container behind an agent (implemented)
+Before this, runner JVMs were children of the server process and shared its container's network,
+so a run could reach the platform database (it had no credentials, but there was a route). Now the
+compose deployment has a `runner` container whose only job is `RunnerAgent`: a small JDK `HttpServer`
+that accepts `POST /runs` with a run spec, launches the child JVM with the same supervisor the server
+uses locally (`ChildJvm`: empty environment, heap and CPU caps, timeout, process-tree kill, output
+caps) and streams the JSON-lines protocol back, ending with an outcome line (termination, exit code,
+stderr, the runner's own host facts). `RunnerLauncher` keeps one interface and picks the mode by
+configuration (`FORGE_RUNNER_AGENT_URL`), so RunQueue, the protocol and every scenario are unchanged;
+each run records `environment.launch.executor` (`runner container (agent)` or `server process`).
+
+Network layout: `runners` is an internal Docker network with the server, the runner and
+`lab-postgres`, a separate disposable PostgreSQL (tmpfs) that Database Studio administers through
+`FORGE_LAB_ADMIN_URL`; the platform database stays on `platform`, which the runner is not on. The server
+refuses HTTP requests from the runner's address (`RunnerNetworkGuard`), because the API has no
+authentication. The agent authenticates the server with a shared token, enforces its own ceilings,
+takes JVM flags from its own catalog, and cancels a run when the server disconnects. Agent calls use
+HTTP/1.1: the JDK `HttpServer` does not implement the h2c upgrade the JDK client may attempt.
+
+Alternatives considered: give the server the Docker socket and start a container per run — stronger
+per-run isolation, but a Docker socket in the server is root on the host, the opposite of the goal;
+`network_mode: none` for the runner — would break Database Studio and the Performance Lab target is
+loopback anyway, so the internal network is the useful middle; gVisor/microVM — the right next step
+for untrusted code, unnecessary for vetted scenarios. Cost: one more long-lived container, a shared
+secret to configure, and runs sharing one runner container (concurrency 1 by default). Remaining
+exposure is listed in SECURITY.md §3.
+
 ## 4. Technology choices
 
 | Choice | Why | Trade-off |
@@ -309,7 +340,8 @@ experiment 1 ──── * run 1 ──── * run_event
 * `run_artifact` — raw outputs (runner stderr, JMH log, thread dumps, traces), size-capped.
 
 Database Studio data lives elsewhere: in per-run schemas of the separate `forge_lab` database
-(ADR-010), created and dropped by each run; nothing of it is persisted except the run's result.
+(ADR-010; in the compose deployment on its own disposable server, `lab-postgres`, ADR-016), created and
+dropped by each run; nothing of it is persisted except the run's result.
 
 ## 6. Scenario SPI (implemented)
 
@@ -331,7 +363,9 @@ explicit and reviewable.
    descriptor bounds → row inserted as `QUEUED`.
 2. `RunQueue` worker picks the run, marks it `RUNNING`, creates a private temp directory.
 3. `RunnerLauncher` builds the command line (`java -Xmx… -XX:ActiveProcessorCount=… -cp <runner>
-   dev.forge.lab.runner.RunnerMain`), clears the environment, writes the `RunSpec` to stdin.
+   dev.forge.lab.runner.RunnerMain`), clears the environment, writes the `RunSpec` to stdin — or,
+   with an agent configured, posts the spec to `RunnerAgent`, which does the same in the runner
+   container and relays stdout (ADR-016).
 4. Events streamed on stdout are persisted as `run_event` rows as they arrive.
 5. On `result`, the result and environment are stored and status becomes `SUCCEEDED`. A
    non-zero exit, protocol error, output-cap breach, or timeout produces `FAILED`/`TIMED_OUT`
@@ -340,6 +374,7 @@ explicit and reviewable.
 
 ## 8. Planned components
 
-| Component | Phase | Notes |
-|---|---|---|
-| k6 adapter | 2 (deferred) | Needs Docker access from the runner and a target reachable from a container; to be designed with the dedicated runner container (Phase 9). The open-model generator, embedded target and pinned-baseline regression gate are implemented. |
+None is in progress. Directions that would change the architecture, in order of value: per-run
+sandboxes (gVisor or a microVM) if uploaded code is ever accepted; authentication before FORGE is
+exposed beyond loopback; push updates instead of polling if runs get long-lived streams. Not-done
+items within the phases are listed in ROADMAP.md.

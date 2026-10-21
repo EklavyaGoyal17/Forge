@@ -25,7 +25,7 @@ class RunnerLauncherTest {
 
     private RunnerLauncher launcher(long stdoutCap) throws Exception {
         RunnerProperties props = new RunnerProperties("", "", root.toString(), 1, 10, 128, 512, 60, 0,
-                stdoutCap, 65_536, 1_048_576, 20, false);
+                stdoutCap, 65_536, 1_048_576, 20, false, null, null);
         return new RunnerLauncher(props, new Json(JsonMapper.builder().build()));
     }
 

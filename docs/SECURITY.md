@@ -11,7 +11,7 @@ contained. Read the "Residual risks" section before exposing FORGE to anyone but
 | Developer machine stability | Runaway CPU/memory/threads from an experiment | Child JVM with `-Xmx`, `-Xss`, `-XX:ActiveProcessorCount`, `-XX:+ExitOnOutOfMemoryError`, wall-clock timeout, process-tree kill |
 | FORGE's own data | Experiment code writing to platform tables | Child JVM never receives platform credentials; empty environment. Database Studio runs receive credentials (over stdin) for a restricted lab role that cannot connect to the platform database |
 | Host secrets | Env vars (`AWS_*`, tokens), home-directory files | Environment cleared before launch; working directory and `java.io.tmpdir` set to a private per-run directory |
-| Other hosts on the network | Load tests or fault injection aimed at real services | No user-supplied targets; the Performance Lab's HTTP target is an embedded service the scenario starts inside the child JVM, bound to 127.0.0.1 on an ephemeral port (verified at start-up), and its load is bounded (≤ 2 000 req/s, ≤ 256 connections, ≤ 10 s sustained per trial, ≤ 13 trials); any future external target requires an explicit allowlist entry |
+| Other hosts on the network | Load tests or fault injection aimed at real services | No user-supplied targets; the Performance Lab's HTTP target is an embedded service the scenario starts inside the child JVM, bound to 127.0.0.1 on an ephemeral port (verified at start-up), and its load is bounded (≤ 2 000 req/s, ≤ 256 connections, ≤ 10 s sustained per trial, ≤ 13 trials); k6 is given only that loopback URL; in compose the runner container has no route off its internal network; any future external target requires an explicit allowlist entry |
 | Server availability | Many queued runs, oversized outputs | Bounded queue, serial execution, stdout/stderr byte caps, parameter bounds |
 | Browser users | XSS through artifacts | Artifacts served as `text/plain` with `X-Content-Type-Options: nosniff`; UI renders text, never HTML from results |
 
@@ -78,15 +78,42 @@ network interface.
   HTML, and is never executed or used to start runs.
 
 ### Container deployment (`docker-compose.yml`)
-* Server image runs as a non-root user.
-* `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, `read_only: true` root filesystem
-  with a size-limited `tmpfs` for `/tmp`, `pids_limit`, `mem_limit`, `cpus`.
-* PostgreSQL is reachable only on the internal compose network and is published to the host on
-  `127.0.0.1` only.
+Runs do not execute in the server container. Four services on two networks (ARCHITECTURE.md ADR-016):
+
+| Service | Networks | Holds | Reaches |
+|---|---|---|---|
+| `postgres` (platform database) | `platform` | experiments, runs, notebook | — |
+| `server` (API + UI) | `platform`, `runners` | platform DB credentials, lab admin credentials, AI key (if configured) | postgres, lab-postgres, runner agent |
+| `runner` (runner agent; every runner JVM is its child) | `runners` only | the agent token | lab-postgres; the server's IP (the API refuses it, below) |
+| `lab-postgres` (Database Studio's disposable server, data on tmpfs) | `runners` only | synthetic lab data | — |
+
+* `runners` is an **internal** Docker network: no route to the internet and no external DNS. The
+  runner cannot resolve or reach the platform database.
+* **The API refuses the runner.** `RunnerNetworkGuard` resolves the runner's address
+  (`FORGE_DENY_REQUESTS_FROM=runner`) and answers 403 to any request from it, so code in a run cannot
+  queue runs or read experiments. The server opens every connection to the agent; it never needs one
+  from it.
+* **The agent** (`RunnerAgent`) accepts a run only with the shared token (`X-Forge-Runner-Token`,
+  compared in constant time), validates the run id, heap and timeout against its own ceilings, and
+  derives JVM flags from its own scenario catalog — never from the request. It applies the same child-JVM
+  controls as above (empty environment, heap cap, timeout, process-tree kill, output caps), limits
+  concurrent runs, and kills a run whose caller disconnects.
+* **k6** (Performance Lab cross-check) is a static binary in the image, started by the runner JVM
+  with an empty environment, usage reporting off, and a script FORGE generates; the launcher refuses
+  any URL that is not `http://127.0.0.1:<port>`, the embedded target in the same run.
+* Both FORGE containers run as a non-root user with `cap_drop: [ALL]`,
+  `security_opt: [no-new-privileges:true]`, a `read_only: true` root filesystem with a size-limited
+  `tmpfs` for `/tmp`, `pids_limit`, `mem_limit` and `cpus` (the runner's limits bound all runs at once).
+* The platform database and the server are published to the host on `127.0.0.1` only; the runner
+  and the lab database are not published at all.
 * No privileged containers, no Docker socket mounts.
 * Docker's default **seccomp** profile applies (verified at runtime: `Seccomp: 2`, filter mode).
-* CI asserts all of the above on the running container (`.github/workflows/ci.yml`, job "Hardened
-  container, end to end").
+* CI asserts all of the above on the running stack (`scripts/verify_isolation.sh` in the job
+  "Hardened container, end to end"): hardening of both containers, the runner reaching lab-postgres but
+  not resolving `postgres` or `example.com`, no connection to `1.1.1.1`, and HTTP 403 from the API to
+  the runner while the host gets 200.
+* Override `FORGE_RUNNER_AGENT_TOKEN`, `FORGE_LAB_ADMIN_PASSWORD` and `FORGE_DB_PASSWORD` (see `.env`
+  support in Docker Compose); the defaults in `docker-compose.yml` are public.
 
 ## 3. Residual risks (honest list)
 
@@ -94,11 +121,16 @@ network interface.
    and open network connections. The controls above limit *accidents* and *resource abuse* by
    vetted scenarios; they would not stop deliberately malicious code. This is why code upload is
    not offered.
-2. **Shared network namespace.** In the compose deployment, child JVMs share the server
-   container's network and could reach PostgreSQL. They never receive platform credentials (Database
-   Studio runs get the restricted lab role, which has no CONNECT on the platform database), but defence
-   in depth would place the runner in its own container on a network with no route to the database.
-   (Planned: dedicated `forge-runner` container, `network_mode: none` for non-HTTP scenarios.)
+2. **What the runner container can still reach.** Runs share one runner container, so a run can
+   see a concurrent run's files in `/tmp` (the agent runs them one at a time by default) and
+   could open TCP connections to lab-postgres and to the server's port. On lab-postgres it receives
+   only a restricted per-run role, but the lab *admin* password is a default unless overridden, and a
+   run that guessed it could damage the other lab data — disposable, on tmpfs, but present. The
+   server answers the runner with 403 at the HTTP layer, keyed on the runner's resolved address; a
+   container that took another address on the `runners` network would not be refused. Agent traffic
+   is plain HTTP on the internal network, authenticated by a shared token. Outside compose (`mvn
+   spring-boot:run`), runner JVMs are still children of the server process on the host, with the
+   controls of §2 "Execution" only.
 3. **Docker containers are not a perfect sandbox either.** They share the host kernel. Kernel
    vulnerabilities, misconfiguration, or a mounted Docker socket defeat them. For untrusted code
    the planned path is gVisor (`runsc`) or a microVM (Firecracker), plus seccomp profiles.

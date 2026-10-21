@@ -26,6 +26,9 @@ management:
 
 forge:
   version: @project.version@
+  security:
+    # Host name whose addresses may not call this server (compose: the runner container). Empty = off.
+    deny-requests-from: ${FORGE_DENY_REQUESTS_FROM:}
   runner:
     # Classpath of the runner JVM. Empty = reuse this server's classpath (development and tests).
     # Production images set this to the shaded forge-lab runner jar only.
@@ -43,6 +46,10 @@ forge:
     artifact-cap-bytes: 1048576
     max-artifacts-per-run: 20
     keep-work-dirs: false
+    # Dedicated runner container (docker-compose): runs are executed by the runner agent at this URL
+    # instead of in this process. Empty = launch runner JVMs here (development).
+    agent-url: ${FORGE_RUNNER_AGENT_URL:}
+    agent-token: ${FORGE_RUNNER_AGENT_TOKEN:}
   # Database Studio: a separate database and restricted role on the same PostgreSQL server.
   # The platform user must be allowed to create roles and databases (the compose user is).
   lab-database:
@@ -50,6 +57,11 @@ forge:
     database: ${FORGE_LAB_DB:forge_lab}
     role: ${FORGE_LAB_ROLE:forge_lab_runner}
     connection-limit: 16
+    # Optional separate PostgreSQL server for the lab database (compose: lab-postgres). Empty = the
+    # platform server.
+    admin-url: ${FORGE_LAB_ADMIN_URL:}
+    admin-user: ${FORGE_LAB_ADMIN_USER:}
+    admin-password: ${FORGE_LAB_ADMIN_PASSWORD:}
     statement-timeout-seconds: 60
     lock-timeout-seconds: 10
   # AI Investigator. Off by default: the rule-based analysis needs no provider. Configured from the

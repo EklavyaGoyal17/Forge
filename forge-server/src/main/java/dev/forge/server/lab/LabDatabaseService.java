@@ -72,7 +72,7 @@ public class LabDatabaseService {
         String role = props.role();
         String db = props.database();
         String url;
-        try (Connection c = platform.getConnection()) {
+        try (Connection c = adminConnection()) {
             c.setAutoCommit(true);
             String platformDb = c.getCatalog();
             if (db.equals(platformDb)) {
@@ -139,10 +139,18 @@ public class LabDatabaseService {
         m.put("role", props.role());
         m.put("provisioned", credentials != null);
         m.put("platformIsolated", platformIsolated);
+        m.put("server", props.separateServer() ? "separate" : "platform");
         m.put("statementTimeoutSeconds", props.statementTimeoutSeconds());
         m.put("lockTimeoutSeconds", props.lockTimeoutSeconds());
         m.put("connectionLimit", props.connectionLimit());
         return m;
+    }
+
+    /** The platform datasource, or a connection to the separate lab server. */
+    private Connection adminConnection() throws SQLException {
+        return props.separateServer()
+                ? DriverManager.getConnection(props.adminUrl(), props.adminUser(), props.adminPassword())
+                : platform.getConnection();
     }
 
     private static int sweep(LabDatabase lab) {

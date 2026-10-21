@@ -1,9 +1,20 @@
 # FORGE local deployment.
 #   docker compose up --build          → UI + API on http://127.0.0.1:8090
-#   docker compose up -d postgres      → database only, for `mvn spring-boot:run` + `npm run dev`
+#   docker compose up -d postgres      → platform database only, for `mvn spring-boot:run` + `npm run dev`
 #
 # Every published port is bound to 127.0.0.1: FORGE has no authentication (docs/SECURITY.md).
+#
+# Isolation layout (docs/SECURITY.md §2):
+#   platform network: postgres (FORGE's own data) and the server.
+#   runners network (internal: no route to the internet): the server, the runner container where every
+#     run executes, and lab-postgres, the disposable database Database Studio runs use.
+#   The runner can reach neither the platform database nor the internet.
 name: forge
+
+networks:
+  platform: {}
+  runners:
+    internal: true
 
 services:
   postgres:
@@ -16,6 +27,7 @@ services:
       - "127.0.0.1:5442:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    networks: [platform]
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U forge -d forge"]
       interval: 2s
@@ -25,27 +37,44 @@ services:
       - no-new-privileges:true
     restart: unless-stopped
 
-  server:
+  # Disposable: its data lives in memory and disappears with the container.
+  lab-postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: postgres
+      POSTGRES_USER: forge_lab_admin
+      POSTGRES_PASSWORD: ${FORGE_LAB_ADMIN_PASSWORD:-forge-lab-admin}
+    networks: [runners]
+    tmpfs:
+      - /var/lib/postgresql/data:size=1g
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U forge_lab_admin -d postgres"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    restart: unless-stopped
+
+  runner:
     build:
       context: .
       dockerfile: docker/server.Dockerfile
-    depends_on:
-      postgres:
-        condition: service_healthy
+    image: forge-app:local
+    entrypoint: ["java", "-XX:MaxRAMPercentage=10", "-Djava.io.tmpdir=/tmp", "-cp", "/app/forge-runner.jar", "dev.forge.lab.runner.RunnerAgent"]
     environment:
-      FORGE_DB_URL: jdbc:postgresql://postgres:5432/forge
-      FORGE_DB_USER: forge
-      FORGE_DB_PASSWORD: ${FORGE_DB_PASSWORD:-forge}
-      # inside the container the server must listen on all interfaces; the host port below is loopback-only
-      FORGE_BIND_ADDRESS: 0.0.0.0
-      # AI Investigator (optional). none = rule-based only; anthropic sends evidence to the Anthropic API.
-      # Runner JVMs never see these: they start with an empty environment.
-      FORGE_AI_PROVIDER: ${FORGE_AI_PROVIDER:-none}
-      FORGE_AI_MODEL: ${FORGE_AI_MODEL:-}
-      FORGE_AI_API_KEY: ${FORGE_AI_API_KEY:-${ANTHROPIC_API_KEY:-}}
-      FORGE_AI_LOCAL_URL: ${FORGE_AI_LOCAL_URL:-http://127.0.0.1:11434/v1}
-    ports:
-      - "127.0.0.1:8090:8090"
+      FORGE_RUNNER_AGENT_TOKEN: ${FORGE_RUNNER_AGENT_TOKEN:-forge-local-runner-token}
+      FORGE_RUNNER_AGENT_PORT: "8095"
+      FORGE_RUNNER_MAX_HEAP_MB: "1024"
+      FORGE_RUNNER_MAX_TIMEOUT_SECONDS: "600"
+    networks: [runners]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8095/health || exit 1"]
+      interval: 5s
+      timeout: 3s
+      start_period: 20s
+      retries: 10
     # Hardening (docs/SECURITY.md §2). Runner JVMs are children of this container and inherit these limits.
     read_only: true
     tmpfs:
@@ -57,6 +86,53 @@ services:
     pids_limit: 1024
     mem_limit: 3g
     cpus: 4
+    restart: unless-stopped
+
+  server:
+    build:
+      context: .
+      dockerfile: docker/server.Dockerfile
+    image: forge-app:local
+    depends_on:
+      postgres:
+        condition: service_healthy
+      lab-postgres:
+        condition: service_healthy
+      runner:
+        condition: service_healthy
+    environment:
+      FORGE_DB_URL: jdbc:postgresql://postgres:5432/forge
+      FORGE_DB_USER: forge
+      FORGE_DB_PASSWORD: ${FORGE_DB_PASSWORD:-forge}
+      # inside the container the server must listen on all interfaces; the host port below is loopback-only
+      FORGE_BIND_ADDRESS: 0.0.0.0
+      # runs execute in the runner container, not in this one
+      FORGE_RUNNER_AGENT_URL: http://runner:8095
+      FORGE_RUNNER_AGENT_TOKEN: ${FORGE_RUNNER_AGENT_TOKEN:-forge-local-runner-token}
+      # refuse API requests from the runner container (code in a run must not be able to call the API)
+      FORGE_DENY_REQUESTS_FROM: runner
+      # Database Studio uses the separate lab server; the server administers it, runs get a restricted role
+      FORGE_LAB_ADMIN_URL: jdbc:postgresql://lab-postgres:5432/postgres
+      FORGE_LAB_ADMIN_USER: forge_lab_admin
+      FORGE_LAB_ADMIN_PASSWORD: ${FORGE_LAB_ADMIN_PASSWORD:-forge-lab-admin}
+      # AI Investigator (optional). none = rule-based only; anthropic sends evidence to the Anthropic API.
+      FORGE_AI_PROVIDER: ${FORGE_AI_PROVIDER:-none}
+      FORGE_AI_MODEL: ${FORGE_AI_MODEL:-}
+      FORGE_AI_API_KEY: ${FORGE_AI_API_KEY:-${ANTHROPIC_API_KEY:-}}
+      FORGE_AI_LOCAL_URL: ${FORGE_AI_LOCAL_URL:-http://127.0.0.1:11434/v1}
+    ports:
+      - "127.0.0.1:8090:8090"
+    networks: [platform, runners]
+    read_only: true
+    tmpfs:
+      - /tmp:size=256m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 512
+    mem_limit: 1g
+    cpus: 2
     restart: unless-stopped
 
 volumes:

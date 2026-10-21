@@ -239,6 +239,7 @@ public class RunQueue implements SmartLifecycle {
         launch.put("timeoutSeconds", run.timeoutSeconds());
         launch.put("activeProcessorCountCap", props.activeProcessorCount());
         launch.put("maxConcurrentRuns", props.maxConcurrentRuns());
+        launch.put("executor", launcher.remote() ? "runner container (agent)" : "server process");
         if (needsLab) {
             Map<String, Object> lab = new LinkedHashMap<>(labDatabase.status());
             lab.keySet().retainAll(List.of("database", "role", "platformIsolated", "statementTimeoutSeconds", "lockTimeoutSeconds", "connectionLimit"));
@@ -247,7 +248,8 @@ public class RunQueue implements SmartLifecycle {
         launch.put("jvmFlags", outcome.commandLine().stream().filter(a -> a.startsWith("-X") || a.startsWith("-XX")).toList());
         ObjectNode env = json.mapper().createObjectNode();
         env.set("runner", c.environment);
-        env.set("host", json.tree(host.facts()));
+        // the machine the run executed on: the runner container's when the agent ran it
+        env.set("host", json.tree(outcome.host() != null ? outcome.host() : host.facts()));
         env.set("launch", json.tree(launch));
         return env;
     }

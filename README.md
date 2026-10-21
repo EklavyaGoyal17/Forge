@@ -18,10 +18,10 @@ there are no placeholder charts.
 
 | Area | What it is |
 |---|---|
-| **Experiment platform** | Experiments, runs, lifecycle, events, artifacts in PostgreSQL (Flyway). A durable run queue (`FOR UPDATE SKIP LOCKED`). Every run executes in its **own JVM**: heap cap, empty environment, private temp dir, timeout, output caps, process-tree kill. |
+| **Experiment platform** | Experiments, runs, lifecycle, events, artifacts in PostgreSQL (Flyway). A durable run queue (`FOR UPDATE SKIP LOCKED`). Every run executes in its **own JVM**: heap cap, empty environment, private temp dir, timeout, output caps, process-tree kill. In Docker that JVM runs in a **separate runner container** on an internal network. That network reaches only a disposable lab database: not the platform database, not the internet, and not the API. |
 | **Statistics** | Baseline vs candidate: bootstrap CI of the ratio of medians and Mann–Whitney U, with parameter and environment diffs. A regression gate against a pinned baseline that refuses a verdict when runs are not comparable. |
 | **Concurrency Lab** | Lost update, deadlock, visibility, backpressure, **livelock** and **starvation** (24 implementations). Stress mode on real cores, a deterministic **interleaving explorer** (every schedule, with a counterexample), and a **liveness explorer** that builds the full state graph and finds fair cycles without progress. |
-| **Performance Lab** | An embedded loopback HTTP service under an open-model load. Latency is measured from the intended send time (coordinated-omission corrected, HdrHistogram), alongside service time, queue wait and the Little's-law bound. **JFR, CPU utilisation and wall-clock worker-thread sampling** show whether a plateau is computing or waiting. |
+| **Performance Lab** | An embedded loopback HTTP service under an open-model load. Latency is measured from the intended send time (coordinated-omission corrected, HdrHistogram), alongside service time, queue wait and the Little's-law bound. **JFR, CPU utilisation and wall-clock worker-thread sampling** show whether a plateau is computing or waiting. A **k6 cross-check** drives the same target with k6 to test FORGE's own generator: they agree on a healthy service (p99 23.6 vs 22.9 ms). Under overload k6 drops 37% of iterations instead of reporting the wait. |
 | **JVM Lab** | Java Flight Recorder inside the runner, summarised there: hot methods, allocation sites, GC pauses, contended locks. JIT warm-up from the first call (tiered / C1 / C2 / interpreter). Allocation-heavy vs allocation-light code. Lock contention. |
 | **Database Studio** | A disposable lab database with a restricted role and seeded data per run. Index experiments, OFFSET vs keyset pagination, N+1, and SQL lost updates under isolation levels. EXPLAIN (ANALYZE, BUFFERS) plan trees. |
 | **Failure Lab** | A dependency started inside the run gets latency, HTTP 500s, dropped connections or a restart injected. Six client policies are compared: no timeout, timeout, immediate retries, backoff with jitter, retry budget, circuit breaker. A per-window recovery timeline makes **metastable retry storms** visible. |
@@ -30,8 +30,8 @@ there are no placeholder charts.
 | **Challenge Arena** | Eight measurable problems. Hypothesis first, hints counted, review questions recorded. Complete **only** when every criterion passes on recorded runs. |
 | **Engineering Review Board, notebook, reports** | An explicit evidence rubric with reviewer questions, a searchable notebook, and Markdown report export (PDF via print). |
 | **Web UI** | Dashboard, experiment workspace, per-lab evidence views, compare, investigate, review, command palette, keyboard shortcuts, dark and light themes. Automated accessibility checks (axe-core, WCAG 2.1 AA token contrast). |
-| **Tests** | 190+ JVM tests (Testcontainers PostgreSQL 17), 67 UI tests. CI also starts the hardened container, asserts its isolation settings and runs every scenario through the API. |
-| Not done | A k6 adapter (deferred by design) and a dedicated runner container without a database route. See [ROADMAP](docs/ROADMAP.md) and [SECURITY](docs/SECURITY.md). |
+| **Tests** | 201 JVM tests (Testcontainers PostgreSQL 17), 67 UI tests. CI also starts the compose stack, asserts container hardening and runner network isolation (`scripts/verify_isolation.sh`), and runs every scenario through the API in the runner container. |
+| Not done | Browser automation (Playwright), a screen-reader audit, a verified call to the real Anthropic API, and per-run sandboxes (gVisor/microVM) for untrusted code. FORGE runs no uploaded code. See [ROADMAP](docs/ROADMAP.md) and the residual risks in [SECURITY](docs/SECURITY.md). |
 
 ### The three showcase demonstrations (Dashboard)
 
@@ -49,7 +49,7 @@ Prerequisites: JDK 21+ (built and tested on 25), Maven 3.9+, Node 22+, Docker.
 docker compose up --build
 ```
 
-Then open http://127.0.0.1:8090. PostgreSQL is published on `127.0.0.1:5442`.
+Then open http://127.0.0.1:8090. PostgreSQL is published on `127.0.0.1:5442`. Four services start: `postgres` (FORGE's data), `server`, `runner` (where every run executes) and `lab-postgres` (Database Studio's disposable server, in memory). Set `FORGE_RUNNER_AGENT_TOKEN`, `FORGE_LAB_ADMIN_PASSWORD` and `FORGE_DB_PASSWORD` in a `.env` file to replace the public defaults.
 
 ### Development (hot reload)
 
@@ -121,7 +121,7 @@ A Spring Boot 4 server (Java 21 bytecode) stores experiments and runs in Postgre
 worker claims queued runs from the database and launches each one as a **separate JVM** running
 `forge-lab`'s `RunnerMain`, with an explicit heap limit, an empty environment and a private
 working directory. The runner re-validates its input, executes a built-in scenario, and streams
-JSON-lines events, artifacts and the final result back over stdout. The React UI renders only what
+JSON-lines events, artifacts and the final result back over stdout. In Docker, the server streams the run to an agent in the runner container instead, which launches the JVM there (ADR-016). The React UI renders only what
 the API returns. See [ARCHITECTURE.md](docs/ARCHITECTURE.md) for the decisions and trade-offs.
 
 ```
