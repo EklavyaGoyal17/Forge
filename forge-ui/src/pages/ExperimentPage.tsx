@@ -9,7 +9,7 @@ import { InvestigatorPanel } from '../components/InvestigatorPanel'
 import { ReviewPanel } from '../components/ReviewPanel'
 import { RunConfigForm } from '../components/RunConfigForm'
 import { RunDetail } from '../components/RunDetail'
-import { Badge, Button, Card, EmptyState, InvariantBadge, Markdownish, StatusPill, Tabs, cx } from '../components/ui'
+import { Badge, Button, Card, EmptyState, InvariantBadge, Markdownish, RoleBadge, StatusPill, Tabs, cx } from '../components/ui'
 import type { CreateRunRequest, Experiment, ExperimentStatus, RegressionCheck, Run, ScenarioDescriptor } from '../lib/api'
 import { ApiError, api } from '../lib/api'
 import { duration, fmt, relativeTime, runDuration } from '../lib/format'
@@ -243,7 +243,7 @@ function RunList({ runs, descriptor, selected, onSelect, pinnedId, checks }: { r
               <span className="min-w-0">
                 <span className="flex items-center gap-2">
                   <span className="num truncate text-[13px]">{r.variant}</span>
-                  <Badge tone={r.role === 'BASELINE' ? 'info' : r.role === 'CANDIDATE' ? 'accent' : 'neutral'}>{r.role.toLowerCase()}</Badge>
+                  <RoleBadge role={r.role} />
                   {explore && <Badge>explore</Badge>}
                   {pinnedId === r.id && <span className="inline-flex items-center gap-1 text-[11px] text-info" title="Pinned regression baseline"><Pin size={11} aria-hidden /> pinned baseline</span>}
                   {checks.get(r.id) && <GateBadge check={checks.get(r.id)!} />}

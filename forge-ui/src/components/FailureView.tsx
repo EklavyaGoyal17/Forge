@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { CartesianGrid, Legend, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { FailureDetails, FailureSeriesPoint, FailureTrial } from '../lib/api'
 import { fmt } from '../lib/format'
+import { axisTick, tooltipLabelStyle, tooltipStyle } from './charts'
 import { Stat, cx } from './ui'
 
 /** Contiguous [start, end) time ranges (ms) in which the breaker was open at some point of each window. */
@@ -39,18 +40,18 @@ function Timeline({ details, trial }: { details: FailureDetails; trial: FailureT
       recoveryAt != null && <ReferenceLine key="rec" x={recoveryAt} stroke="var(--ok)" strokeDasharray="4 3" />,
     ].filter(Boolean)
   )
-  const axis = <XAxis dataKey="tMs" type="number" domain={[0, 'dataMax']} tickFormatter={(v) => `${(v / 1000).toFixed(1)}s`} stroke="var(--muted)" fontSize={11} />
+  const axis = <XAxis dataKey="tMs" type="number" domain={[0, 'dataMax']} tickFormatter={(v) => `${(v / 1000).toFixed(1)}s`} tick={axisTick} stroke="var(--border)" />
   const panel = (title: string, children: ReactNode, unit: string) => (
     <div>
       <h5 className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted">{title}</h5>
       <div className="h-36">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 4, right: 16, bottom: 0, left: 4 }} syncId={`failure-${trial.trial}`}>
-            <CartesianGrid stroke="var(--border)" strokeDasharray="2 4" />
+            <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" />
             {refs}
             {axis}
-            <YAxis stroke="var(--muted)" fontSize={11} width={48} unit={unit} />
-            <Tooltip contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)', fontSize: 12 }}
+            <YAxis tick={axisTick} stroke="var(--border)" width={48} unit={unit} />
+            <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle}
                      labelFormatter={(v) => `t = ${fmt(Number(v))} ms`} formatter={(v) => (typeof v === 'number' ? fmt(v) : String(v))} />
             {children}
           </LineChart>

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { CartesianGrid, Legend, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { HttpLoadDetails, HttpLoadTrial, LatencyKind, LatencySummary, LoadSeriesPoint, WorkerThreadProfile } from '../lib/api'
 import { fmt } from '../lib/format'
+import { axisTick, tooltipLabelStyle, tooltipStyle } from './charts'
 import { cx } from './ui'
 
 const KINDS: LatencyKind[] = ['client', 'uncorrected', 'service', 'queueWait']
@@ -20,8 +21,6 @@ const KIND_COLOR: Record<LatencyKind, string> = {
   queueWait: 'var(--series-4)',
 }
 
-const tooltipStyle = { background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }
-const axisTick = { fill: 'var(--muted)', fontSize: 11 }
 
 /** Position of percentile p on a "nines" axis: 1 / (1 − p). p50 → 2, p99 → 100, p99.9 → 1000. */
 export function ninesX(p: number): number {
@@ -254,7 +253,7 @@ function LatencyOverTime({ trial }: { trial: HttpLoadTrial }) {
           <ReferenceLine x={trial.measureEndMs} stroke="var(--border-strong)" strokeDasharray="4 4" label={{ value: 'end of schedule', fill: 'var(--muted)', fontSize: 10, position: 'insideTopRight' }} />
           {TimeAxis()}
           <YAxis tick={axisTick} stroke="var(--border)" width={64} tickFormatter={(v: number) => fmt(v, 3)} label={{ value: 'ms', angle: -90, position: 'insideLeft', fill: 'var(--muted)', fontSize: 11 }} />
-          <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--muted)' }} labelFormatter={(l) => `t = ${fmt(Number(l) / 1000, 3)} s`} formatter={(v: number, name: string) => [`${fmt(v)} ms`, name]} />
+          <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} labelFormatter={(l) => `t = ${fmt(Number(l) / 1000, 3)} s`} formatter={(v: number, name: string) => [`${fmt(v)} ms`, name]} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
           <Line type="linear" dataKey="p50Ms" name="p50" stroke="var(--series-1)" dot={false} isAnimationActive={false} connectNulls={false} />
           <Line type="linear" dataKey="p99Ms" name="p99" stroke="var(--series-2)" dot={false} isAnimationActive={false} connectNulls={false} />
@@ -276,7 +275,7 @@ function RateOverTime({ trial, windowMs }: { trial: HttpLoadTrial; windowMs: num
           {trial.measureStartMs > 0 && <ReferenceArea x1={0} x2={trial.measureStartMs} fill="var(--muted)" fillOpacity={0.08} />}
           {TimeAxis()}
           <YAxis tick={axisTick} stroke="var(--border)" width={64} tickFormatter={(v: number) => fmt(v, 3)} label={{ value: 'req/s', angle: -90, position: 'insideLeft', fill: 'var(--muted)', fontSize: 11 }} />
-          <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--muted)' }} labelFormatter={(l) => `t = ${fmt(Number(l) / 1000, 3)} s`} formatter={(v: number, name: string) => [`${fmt(v)} req/s`, name]} />
+          <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} labelFormatter={(l) => `t = ${fmt(Number(l) / 1000, 3)} s`} formatter={(v: number, name: string) => [`${fmt(v)} req/s`, name]} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
           <Line type="stepAfter" dataKey="offered" name="offered (by intended time)" stroke="var(--muted)" dot={false} isAnimationActive={false} />
           <Line type="stepAfter" dataKey="completed" name="completed OK" stroke="var(--ok)" dot={false} isAnimationActive={false} />
@@ -300,7 +299,7 @@ function PercentileSpectrum({ details }: { details: HttpLoadDetails }) {
             <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" />
             <XAxis dataKey="x" type="number" scale="log" domain={[1, 'dataMax']} ticks={ticks} tick={axisTick} stroke="var(--border)" tickFormatter={ninesLabel} />
             <YAxis tick={axisTick} stroke="var(--border)" width={64} tickFormatter={(v: number) => fmt(v, 3)} label={{ value: 'ms', angle: -90, position: 'insideLeft', fill: 'var(--muted)', fontSize: 11 }} />
-            <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: 'var(--muted)' }} labelFormatter={(l) => ninesLabel(Number(l))} formatter={(v: number, name: string) => [`${fmt(v)} ms`, name]} />
+            <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} labelFormatter={(l) => ninesLabel(Number(l))} formatter={(v: number, name: string) => [`${fmt(v)} ms`, name]} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             {KINDS.map((k) => (
               <Line key={k} type="linear" dataKey={k} name={KIND_LABEL[k]} stroke={KIND_COLOR[k]} dot={{ r: 2.5 }} isAnimationActive={false} connectNulls={false} />

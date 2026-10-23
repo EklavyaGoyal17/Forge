@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
-import { Button, Card, EmptyState, Stat, StatusPill } from '../components/ui'
+import { ButtonLink, Card, EmptyState, Stat, StatusPill } from '../components/ui'
 import { api } from '../lib/api'
 import { bytes, duration, relativeTime, runDuration } from '../lib/format'
 import { ExperimentTable } from './Experiments'
@@ -45,7 +45,7 @@ export function Dashboard() {
             <div className="flex h-full flex-col gap-3">
               <h2 className="font-semibold">{s.title}</h2>
               <p className="flex-1 text-[13px] leading-relaxed text-dim">{s.text}</p>
-              <div><Link to={s.to}><Button variant="primary">Start <ArrowRight size={14} /></Button></Link></div>
+              <ButtonLink to={s.to} variant="primary">Start <ArrowRight size={14} /></ButtonLink>
             </div>
           </Card>
         ))}

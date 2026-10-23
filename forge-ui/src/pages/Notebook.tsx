@@ -2,7 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { BookOpen } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link } from 'react-router'
-import { Badge, Card, EmptyState, cx, inputClass } from '../components/ui'
+import { Card, EmptyState, ExperimentStatusBadge, cx, inputClass } from '../components/ui'
 import type { ExperimentSummary } from '../lib/api'
 import { api } from '../lib/api'
 import { relativeTime } from '../lib/format'
@@ -41,7 +41,7 @@ export function NotebookPage() {
                   <div className="flex flex-col gap-2">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link to={`/experiments/${e.id}`} className="font-semibold hover:text-accent">{e.title}</Link>
-                      <Badge tone={e.status === 'CONCLUDED' ? 'ok' : 'info'}>{e.status.toLowerCase()}</Badge>
+                      <ExperimentStatusBadge status={e.status} />
                       <span className="num text-[12px] text-muted">{e.scenarioId}</span>
                       <span className="text-[12px] text-muted">· {succeededRuns}/{runCount} runs · {relativeTime(e.updatedAt)}</span>
                     </div>

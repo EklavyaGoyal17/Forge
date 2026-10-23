@@ -2,10 +2,9 @@ import { useMemo, useState, type ReactNode } from 'react'
 import { CartesianGrid, Line, LineChart, ReferenceArea, ReferenceLine, ResponsiveContainer, Scatter, ScatterChart, Tooltip, XAxis, YAxis } from 'recharts'
 import type { JfrContention, JfrMarker, JfrSummary, JvmDetails, WarmupCompilation, WarmupTrialSeries } from '../lib/api'
 import { bytes, fmt, pct } from '../lib/format'
+import { axisTick, tooltipStyle } from './charts'
 import { cx } from './ui'
 
-const tooltipStyle = { background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }
-const axisTick = { fill: 'var(--muted)', fontSize: 11 }
 
 /** Class and method without the package: `dev.forge.X$Y.m:12` → `X$Y.m:12`; `byte[]` stays `byte[]`. */
 export function shortFrame(frame: string | null | undefined): string {

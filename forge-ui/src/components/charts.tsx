@@ -2,6 +2,11 @@ import { CartesianGrid, ComposedChart, Line, ReferenceLine, ResponsiveContainer,
 import type { ComparisonResult, Trial } from '../lib/api'
 import { fmt, toNumber } from '../lib/format'
 
+/** Shared Recharts styling, so every chart's axes and tooltips look the same in both themes. */
+export const tooltipStyle = { background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }
+export const tooltipLabelStyle = { color: 'var(--muted)' }
+export const axisTick = { fill: 'var(--muted)', fontSize: 11 }
+
 /** Per-trial values of one metric, in execution order. Red points are trials that violated the invariant. */
 export function TrialChart({ trials, metric, unit, median }: { trials: Trial[]; metric: string; unit?: string; median?: number }) {
   const data = trials
@@ -13,11 +18,11 @@ export function TrialChart({ trials, metric, unit, median }: { trials: Trial[]; 
       <ResponsiveContainer width="100%" height="100%">
         <ComposedChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
           <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" />
-          <XAxis dataKey="trial" tick={{ fill: 'var(--muted)', fontSize: 11 }} stroke="var(--border)" label={{ value: 'trial', position: 'insideBottomRight', offset: -2, fill: 'var(--muted)', fontSize: 11 }} />
-          <YAxis tick={{ fill: 'var(--muted)', fontSize: 11 }} stroke="var(--border)" width={64} tickFormatter={(v) => fmt(v, 3)} domain={['auto', 'auto']} />
+          <XAxis dataKey="trial" tick={axisTick} stroke="var(--border)" label={{ value: 'trial', position: 'insideBottomRight', offset: -2, fill: 'var(--muted)', fontSize: 11 }} />
+          <YAxis tick={axisTick} stroke="var(--border)" width={64} tickFormatter={(v) => fmt(v, 3)} domain={['auto', 'auto']} />
           <Tooltip
-            contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }}
-            labelStyle={{ color: 'var(--muted)' }}
+            contentStyle={tooltipStyle}
+            labelStyle={tooltipLabelStyle}
             formatter={(v: number) => [`${fmt(v)}${unit ? ` ${unit}` : ''}`, metric]}
             labelFormatter={(l) => `trial ${l}`}
           />

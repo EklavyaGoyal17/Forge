@@ -2,7 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query'
 import { FlaskConical, Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
-import { Badge, Button, Card, EmptyState, Field, cx, inputClass, textareaClass } from '../components/ui'
+import { Button, ButtonLink, Card, EmptyState, ExperimentStatusBadge, Field, cx, inputClass, textareaClass } from '../components/ui'
 import type { ExperimentSummary, Lab, ScenarioDescriptor } from '../lib/api'
 import { ApiError, api } from '../lib/api'
 import { relativeTime } from '../lib/format'
@@ -19,7 +19,7 @@ export function ExperimentsPage() {
           <h1 className="text-[22px] font-semibold tracking-tight">Experiments</h1>
           <p className="text-dim">Each experiment is one engineering question, one hypothesis, and the runs that test it.</p>
         </div>
-        <Link to="/experiments/new"><Button variant="primary"><Plus size={14} /> New experiment</Button></Link>
+        <ButtonLink to="/experiments/new" variant="primary"><Plus size={14} /> New experiment</ButtonLink>
       </div>
       <div className="flex flex-wrap gap-3">
         <input aria-label="Search experiments" className={cx(inputClass, 'max-w-sm')} placeholder="Search title, question, hypothesis, tags…" value={q} onChange={(e) => setQ(e.target.value)} />
@@ -38,7 +38,7 @@ export function ExperimentTable({ rows, loading }: { rows?: ExperimentSummary[];
   if (!rows || rows.length === 0) {
     return (
       <Card>
-        <EmptyState icon={<FlaskConical size={28} />} title="No experiments yet" action={<Link to="/experiments/new"><Button variant="primary">Create the first one</Button></Link>}>
+        <EmptyState icon={<FlaskConical size={28} />} title="No experiments yet" action={<ButtonLink to="/experiments/new" variant="primary">Create the first one</ButtonLink>}>
           Pick a scenario, write down what you expect to happen and why, then let the measurements disagree with you.
         </EmptyState>
       </Card>
@@ -60,7 +60,7 @@ export function ExperimentTable({ rows, loading }: { rows?: ExperimentSummary[];
                 <p className="line-clamp-1 text-[12px] text-muted">{e.hypothesis}</p>
               </td>
               <td className="num px-4 py-2.5 text-[12px] text-dim">{e.scenarioId}</td>
-              <td className="px-4 py-2.5"><Badge tone={e.status === 'CONCLUDED' ? 'ok' : e.status === 'ARCHIVED' ? 'neutral' : 'info'}>{e.status.toLowerCase()}</Badge></td>
+              <td className="px-4 py-2.5"><ExperimentStatusBadge status={e.status} /></td>
               <td className="num px-4 py-2.5 text-dim">{succeededRuns}/{runCount}</td>
               <td className="px-4 py-2.5 text-dim">{relativeTime(lastRunAt)}</td>
               <td className="px-4 py-2.5 text-dim">{relativeTime(e.updatedAt)}</td>

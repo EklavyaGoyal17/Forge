@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import type { DatabaseDetails, ExplainCapture, PlanNode } from '../lib/api'
 import { fmt } from '../lib/format'
+import { axisTick, tooltipLabelStyle, tooltipStyle } from './charts'
 import { CodeBlock, cx } from './ui'
 
 export interface PlanRow {
@@ -170,7 +171,6 @@ export function DatabaseView({ details }: { details: DatabaseDetails }) {
 }
 
 function DepthSweep({ sweep }: { sweep: NonNullable<DatabaseDetails['sweep']> }) {
-  const tick = { fill: 'var(--muted)', fontSize: 11 }
   return (
     <div className="flex flex-col gap-2">
       <h4 className="text-[12px] font-medium uppercase tracking-wider text-muted">Page depth sweep (this variant)</h4>
@@ -178,10 +178,10 @@ function DepthSweep({ sweep }: { sweep: NonNullable<DatabaseDetails['sweep']> })
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={sweep} margin={{ top: 8, right: 16, bottom: 4, left: 4 }}>
             <CartesianGrid stroke="var(--grid)" strokeDasharray="3 3" />
-            <XAxis dataKey="page" type="number" scale="log" domain={['dataMin', 'dataMax']} ticks={sweep.map((s) => s.page)} tick={tick} stroke="var(--border)" tickFormatter={(v: number) => fmt(v)} />
-            <YAxis yAxisId="ms" tick={tick} stroke="var(--border)" width={56} tickFormatter={(v: number) => fmt(v, 3)} label={{ value: 'ms', angle: -90, position: 'insideLeft', fill: 'var(--muted)', fontSize: 11 }} />
-            <YAxis yAxisId="rows" orientation="right" tick={tick} stroke="var(--border)" width={64} tickFormatter={(v: number) => fmt(v)} />
-            <Tooltip contentStyle={{ background: 'var(--panel)', border: '1px solid var(--border)', borderRadius: 6, fontSize: 12 }} labelFormatter={(l) => `page ${fmt(Number(l))}`} />
+            <XAxis dataKey="page" type="number" scale="log" domain={['dataMin', 'dataMax']} ticks={sweep.map((s) => s.page)} tick={axisTick} stroke="var(--border)" tickFormatter={(v: number) => fmt(v)} />
+            <YAxis yAxisId="ms" tick={axisTick} stroke="var(--border)" width={56} tickFormatter={(v: number) => fmt(v, 3)} label={{ value: 'ms', angle: -90, position: 'insideLeft', fill: 'var(--muted)', fontSize: 11 }} />
+            <YAxis yAxisId="rows" orientation="right" tick={axisTick} stroke="var(--border)" width={64} tickFormatter={(v: number) => fmt(v)} />
+            <Tooltip contentStyle={tooltipStyle} labelStyle={tooltipLabelStyle} labelFormatter={(l) => `page ${fmt(Number(l))}`} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Line yAxisId="ms" dataKey="medianMs" name="median page time (ms)" stroke="var(--series-1)" isAnimationActive={false} />
             <Line yAxisId="rows" dataKey="rowsScanned" name="rows read by scans" stroke="var(--series-2)" isAnimationActive={false} />

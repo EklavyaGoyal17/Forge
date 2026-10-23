@@ -1,6 +1,8 @@
 import type { ButtonHTMLAttributes, ReactNode } from 'react'
 import { useId } from 'react'
-import type { CheckStatus, RunStatus, Verdict } from '../lib/api'
+import type { LinkProps } from 'react-router'
+import { Link } from 'react-router'
+import type { CheckStatus, ExperimentStatus, RunRole, RunStatus, Verdict } from '../lib/api'
 
 export function cx(...parts: (string | false | null | undefined)[]) {
   return parts.filter(Boolean).join(' ')
@@ -8,21 +10,25 @@ export function cx(...parts: (string | false | null | undefined)[]) {
 
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger'
 
-export function Button({ variant = 'secondary', className, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
-  return (
-    <button
-      {...rest}
-      className={cx(
-        'inline-flex items-center justify-center gap-1.5 rounded-md px-3 h-8 text-[13px] font-medium transition-colors',
-        'disabled:opacity-50 disabled:cursor-not-allowed',
-        variant === 'primary' && 'bg-accent text-accent-ink hover:brightness-110',
-        variant === 'secondary' && 'bg-panel-2 text-text border border-border hover:border-border-strong',
-        variant === 'ghost' && 'text-dim hover:text-text hover:bg-panel-2',
-        variant === 'danger' && 'bg-bad-soft text-bad border border-bad/30 hover:bg-bad/20',
-        className,
-      )}
-    />
+function buttonClass(variant: Variant, className?: string) {
+  return cx(
+    'inline-flex items-center justify-center gap-1.5 rounded-md px-3 h-8 text-[13px] font-medium transition-colors',
+    'disabled:opacity-50 disabled:cursor-not-allowed',
+    variant === 'primary' && 'bg-accent text-accent-ink hover:brightness-110',
+    variant === 'secondary' && 'bg-panel-2 text-text border border-border hover:border-border-strong',
+    variant === 'ghost' && 'text-dim hover:text-text hover:bg-panel-2',
+    variant === 'danger' && 'bg-bad-soft text-bad border border-bad/30 hover:bg-bad/20',
+    className,
   )
+}
+
+export function Button({ variant = 'secondary', className, ...rest }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
+  return <button {...rest} className={buttonClass(variant, className)} />
+}
+
+/** Navigation that looks like a button: one link, one tab stop (a button inside a link is two). */
+export function ButtonLink({ variant = 'secondary', className, ...rest }: LinkProps & { variant?: Variant }) {
+  return <Link {...rest} className={buttonClass(variant, cx('w-fit', className))} />
 }
 
 export function Card({ title, actions, children, className, dense }: {
@@ -76,6 +82,28 @@ export function Badge({ tone = 'neutral', children, title }: { tone?: 'neutral' 
     <span title={title} className={cx('inline-flex items-center rounded border px-1.5 h-5 text-[11px] font-medium whitespace-nowrap', t)}>
       {children}
     </span>
+  )
+}
+
+const ROLE_TONE: Record<RunRole, 'info' | 'accent' | 'neutral'> = { BASELINE: 'info', CANDIDATE: 'accent', EXPLORATORY: 'neutral' }
+
+export function RoleBadge({ role }: { role: RunRole }) {
+  return <Badge tone={ROLE_TONE[role]}>{role.toLowerCase()}</Badge>
+}
+
+const EXPERIMENT_TONE: Record<ExperimentStatus, 'ok' | 'info' | 'neutral'> = { OPEN: 'info', CONCLUDED: 'ok', ARCHIVED: 'neutral' }
+
+export function ExperimentStatusBadge({ status }: { status: ExperimentStatus }) {
+  return <Badge tone={EXPERIMENT_TONE[status]}>{status.toLowerCase()}</Badge>
+}
+
+/** A failed request, said as such: never rendered as "nothing here". */
+export function QueryError({ error, what }: { error: unknown; what: string }) {
+  const detail = error instanceof Error ? error.message : String(error)
+  return (
+    <p role="alert" className="rounded-md border border-bad/30 bg-bad-soft px-3 py-2 text-[13px] text-bad">
+      Could not load {what}: {detail}
+    </p>
   )
 }
 

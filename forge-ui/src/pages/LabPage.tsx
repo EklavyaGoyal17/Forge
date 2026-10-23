@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
-import { Link } from 'react-router'
-import { Badge, Button, Card, EmptyState } from '../components/ui'
+import { Badge, ButtonLink, Card, EmptyState } from '../components/ui'
 import type { Lab } from '../lib/api'
 import { api } from '../lib/api'
 import { MODULES } from '../lib/labs'
@@ -91,7 +90,7 @@ export function LabPage({ lab }: { lab: Lab }) {
               </div>
               {s.invariant && <p className="text-[12px] text-muted"><span className="text-dim">Invariant:</span> {s.invariant}</p>}
               <div className="mt-auto">
-                <Link to={`/experiments/new?scenario=${encodeURIComponent(s.id)}`}><Button variant="primary">Start experiment <ArrowRight size={14} /></Button></Link>
+                <ButtonLink to={`/experiments/new?scenario=${encodeURIComponent(s.id)}`} variant="primary">Start experiment <ArrowRight size={14} /></ButtonLink>
               </div>
             </div>
           </Card>

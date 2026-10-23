@@ -11,7 +11,7 @@ import { HttpLoadView } from './HttpLoadView'
 import { FailureView } from './FailureView'
 import { JvmView } from './JvmView'
 import { LivenessView } from './LivenessView'
-import { Badge, Button, InvariantBadge, Stat, StatusPill, Tabs, cx } from './ui'
+import { Button, InvariantBadge, RoleBadge, Stat, StatusPill, Tabs, cx } from './ui'
 
 type Tab = 'results' | 'timeline' | 'artifacts' | 'environment' | 'config'
 
@@ -48,7 +48,7 @@ export function RunDetail({ runId, descriptor, pin }: { runId: string; descripto
       <div className="flex flex-wrap items-center gap-3">
         <h3 className="text-[15px] font-semibold">Run #{run.seq}</h3>
         <StatusPill status={run.status} />
-        <Badge tone={run.role === 'BASELINE' ? 'info' : run.role === 'CANDIDATE' ? 'accent' : 'neutral'}>{run.role.toLowerCase()}</Badge>
+        <RoleBadge role={run.role} />
         <span className="num text-[13px] text-dim">{run.variant}</span>
         {run.label && <span className="text-[13px] text-muted">“{run.label}”</span>}
         <div className="flex-1" />
