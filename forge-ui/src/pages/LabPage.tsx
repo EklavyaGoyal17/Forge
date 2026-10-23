@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
-import { Badge, ButtonLink, Card, EmptyState } from '../components/ui'
+import { ExperimentTable } from '../components/ExperimentTable'
+import { Badge, ButtonLink, Card, EmptyState, QueryError } from '../components/ui'
 import type { Lab } from '../lib/api'
 import { api } from '../lib/api'
 import { MODULES } from '../lib/labs'
-import { ExperimentTable } from './Experiments'
 
 const LAB_INTRO: Partial<Record<Lab, { heading: string; points: string[] }>> = {
   CONCURRENCY: {
@@ -95,11 +95,12 @@ export function LabPage({ lab }: { lab: Lab }) {
             </div>
           </Card>
         ))}
-        {list.length === 0 && !scenarios.isLoading && <EmptyState title="No scenarios in this lab yet" />}
+        {scenarios.isError && <QueryError error={scenarios.error} what="the scenario catalog" />}
+        {list.length === 0 && scenarios.isSuccess && <EmptyState title="No scenarios in this lab yet" />}
       </div>
       <div className="flex flex-col gap-3">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dim">Experiments in this lab</h2>
-        <ExperimentTable rows={experiments.data} loading={experiments.isLoading} />
+        <ExperimentTable rows={experiments.data} loading={experiments.isLoading} error={experiments.error} />
       </div>
     </div>
   )

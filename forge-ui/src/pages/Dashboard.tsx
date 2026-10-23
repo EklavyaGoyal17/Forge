@@ -1,10 +1,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
-import { ButtonLink, Card, EmptyState, Stat, StatusPill } from '../components/ui'
+import { ExperimentTable } from '../components/ExperimentTable'
+import { ButtonLink, Card, EmptyState, QueryError, Stat, StatusPill } from '../components/ui'
 import { api } from '../lib/api'
 import { bytes, duration, relativeTime, runDuration } from '../lib/format'
-import { ExperimentTable } from './Experiments'
 
 const SHOWCASES: { title: string; text: string; to: string }[] = [
   {
@@ -53,7 +53,11 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <Card title="Recent runs" dense>
-          {runs.data && runs.data.length > 0 ? (
+          {runs.isError ? (
+            <div className="p-4"><QueryError error={runs.error} what="recent runs" /></div>
+          ) : runs.isLoading ? (
+            <p className="p-4 text-muted">Loading runs…</p>
+          ) : runs.data && runs.data.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-[13px]">
                 <caption className="sr-only">The most recently queued runs</caption>
@@ -105,7 +109,7 @@ export function Dashboard() {
 
       <div className="flex flex-col gap-3">
         <h2 className="text-[13px] font-semibold uppercase tracking-wide text-dim">Recent experiments</h2>
-        <ExperimentTable rows={experiments.data?.slice(0, 6)} loading={experiments.isLoading} />
+        <ExperimentTable rows={experiments.data?.slice(0, 6)} loading={experiments.isLoading} error={experiments.error} />
       </div>
     </div>
   )

@@ -11,7 +11,7 @@ import { RunConfigForm } from '../components/RunConfigForm'
 import { RunDetail } from '../components/RunDetail'
 import { Badge, Button, Card, EmptyState, InvariantBadge, Markdownish, QueryError, RoleBadge, StatusPill, Tabs, cx } from '../components/ui'
 import type { CreateRunRequest, Experiment, ExperimentStatus, RegressionCheck, Run, ScenarioDescriptor } from '../lib/api'
-import { ApiError, api } from '../lib/api'
+import { ApiError, api, isNotFound } from '../lib/api'
 import { duration, fmt, relativeTime, runDuration } from '../lib/format'
 import { LAB_LABEL } from '../lib/labs'
 
@@ -37,7 +37,14 @@ export function ExperimentPage() {
   })
 
   if (exp.isLoading) return <p className="p-4 sm:p-6 text-muted">Loading experiment…</p>
-  if (exp.isError || !exp.data) return <EmptyState title="Experiment not found">It may have been deleted. <Link className="text-accent" to="/experiments">All experiments</Link></EmptyState>
+  if (!exp.data) {
+    return (
+      <div className="mx-auto max-w-5xl p-4 sm:p-6">
+        {exp.isError && !isNotFound(exp.error) ? <QueryError error={exp.error} what="this experiment" />
+          : <Card><EmptyState title="Experiment not found">It may have been deleted. <Link className="text-accent" to="/experiments">All experiments</Link></EmptyState></Card>}
+      </div>
+    )
+  }
   const { experiment, runs } = exp.data
   const d = scenario.data?.descriptor
   const runsKey = runs.map((r) => `${r.id}:${r.status}`).join(',')

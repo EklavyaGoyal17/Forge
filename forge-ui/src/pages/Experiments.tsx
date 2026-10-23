@@ -1,11 +1,11 @@
 import { useMutation, useQuery } from '@tanstack/react-query'
-import { FlaskConical, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router'
-import { Button, ButtonLink, Card, EmptyState, ExperimentStatusBadge, Field, cx, inputClass, textareaClass } from '../components/ui'
-import type { ExperimentSummary, Lab, ScenarioDescriptor } from '../lib/api'
+import { useNavigate, useSearchParams } from 'react-router'
+import { ExperimentTable } from '../components/ExperimentTable'
+import { Button, ButtonLink, Card, Field, QueryError, cx, inputClass, textareaClass } from '../components/ui'
+import type { Lab, ScenarioDescriptor } from '../lib/api'
 import { ApiError, api } from '../lib/api'
-import { relativeTime } from '../lib/format'
 import { LAB_LABEL } from '../lib/labs'
 
 export function ExperimentsPage() {
@@ -25,49 +25,10 @@ export function ExperimentsPage() {
         <input aria-label="Search experiments" className={cx(inputClass, 'max-w-sm')} placeholder="Search title, question, hypothesis, tags…" value={q} onChange={(e) => setQ(e.target.value)} />
         <select aria-label="Filter by lab" className={cx(inputClass, 'max-w-48')} value={lab} onChange={(e) => setLab(e.target.value)}>
           <option value="">All labs</option>
-          {(['CONCURRENCY', 'ALGORITHMS'] as Lab[]).map((l) => <option key={l} value={l.toLowerCase()}>{LAB_LABEL[l]}</option>)}
+          {(Object.keys(LAB_LABEL) as Lab[]).map((l) => <option key={l} value={l.toLowerCase()}>{LAB_LABEL[l]}</option>)}
         </select>
       </div>
-      <ExperimentTable rows={list.data} loading={list.isLoading} />
-    </div>
-  )
-}
-
-export function ExperimentTable({ rows, loading }: { rows?: ExperimentSummary[]; loading?: boolean }) {
-  if (loading) return <p className="text-muted">Loading…</p>
-  if (!rows || rows.length === 0) {
-    return (
-      <Card>
-        <EmptyState icon={<FlaskConical size={28} />} title="No experiments yet" action={<ButtonLink to="/experiments/new" variant="primary">Create the first one</ButtonLink>}>
-          Pick a scenario, write down what you expect to happen and why, then let the measurements disagree with you.
-        </EmptyState>
-      </Card>
-    )
-  }
-  return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-panel">
-      <table className="w-full text-[13px]">
-        <thead className="bg-panel-2 text-left text-[11px] uppercase tracking-wider text-muted">
-          <tr>
-            {['Experiment', 'Scenario', 'Status', 'Runs', 'Last run', 'Updated'].map((h) => <th key={h} scope="col" className="px-4 py-2 font-medium">{h}</th>)}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map(({ experiment: e, runCount, succeededRuns, lastRunAt }) => (
-            <tr key={e.id} className="border-t border-border hover:bg-panel-2/50">
-              <td className="px-4 py-2.5">
-                <Link to={`/experiments/${e.id}`} className="font-medium text-text hover:text-accent">{e.title}</Link>
-                <p className="line-clamp-1 text-[12px] text-muted">{e.hypothesis}</p>
-              </td>
-              <td className="num px-4 py-2.5 text-[12px] text-dim">{e.scenarioId}</td>
-              <td className="px-4 py-2.5"><ExperimentStatusBadge status={e.status} /></td>
-              <td className="num px-4 py-2.5 text-dim">{succeededRuns}/{runCount}</td>
-              <td className="px-4 py-2.5 text-dim">{relativeTime(lastRunAt)}</td>
-              <td className="px-4 py-2.5 text-dim">{relativeTime(e.updatedAt)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <ExperimentTable rows={list.data} loading={list.isLoading} error={list.error} filtered={Boolean(q.trim() || lab)} />
     </div>
   )
 }
@@ -124,6 +85,8 @@ export function NewExperimentPage() {
       </div>
       <Card title="1 · Scenario">
         <div className="flex flex-col gap-4">
+          {scenarios.isError && <QueryError error={scenarios.error} what="the scenario catalog" />}
+          {scenarios.isLoading && <p className="text-muted">Loading scenarios…</p>}
           {byLab.map(([lab, list]) => (
             <fieldset key={lab}>
               <legend className="mb-2 text-[12px] font-medium text-muted">{LAB_LABEL[lab]}</legend>

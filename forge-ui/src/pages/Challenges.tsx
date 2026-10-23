@@ -2,8 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { CheckCircle2, Circle, Trophy } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { Badge, Button, Card, EmptyState, textareaClass } from '../components/ui'
-import { ApiError, api, type AttemptView, type ChallengeInfo } from '../lib/api'
+import { Badge, Button, Card, EmptyState, QueryError, textareaClass } from '../components/ui'
+import { ApiError, api, isNotFound, type AttemptView, type ChallengeInfo } from '../lib/api'
 import { relativeTime } from '../lib/format'
 import { LAB_LABEL } from '../lib/labs'
 
@@ -26,6 +26,8 @@ export function ChallengesPage() {
           self-assessment.
         </p>
       </div>
+      {list.isError && <QueryError error={list.error} what="the challenges" />}
+      {list.isLoading && <p className="text-muted">Loading challenges…</p>}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {(list.data ?? []).map(({ challenge: c, latest, attempts, everCompleted }) => (
           <Link key={c.id} to={`/challenges/${c.id}`} className="block rounded-lg focus-visible:outline-2">
@@ -145,8 +147,15 @@ export function ChallengePage() {
   const qc = useQueryClient()
   const data = useQuery({ queryKey: ['challenge', id], queryFn: () => api.challenge(id) })
   const [restart, setRestart] = useState(false)
-  if (data.isLoading) return <p className="p-4 sm:p-6 text-muted">Loading…</p>
-  if (!data.data) return <div className="p-4 sm:p-6"><Card><EmptyState title="No such challenge"><Link to="/challenges" className="text-accent">All challenges</Link></EmptyState></Card></div>
+  if (data.isLoading) return <p className="p-4 sm:p-6 text-muted">Loading challenge…</p>
+  if (!data.data) {
+    return (
+      <div className="mx-auto max-w-5xl p-4 sm:p-6">
+        {data.isError && !isNotFound(data.error) ? <QueryError error={data.error} what="this challenge" />
+          : <Card><EmptyState title="No such challenge"><Link to="/challenges" className="text-accent">All challenges</Link></EmptyState></Card>}
+      </div>
+    )
+  }
   const { challenge: c, attempts } = data.data
   const latest = attempts[0]
   const started = () => {
