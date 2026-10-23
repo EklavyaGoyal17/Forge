@@ -123,9 +123,10 @@ export function ExplorerView({ details }: { details: ExplorerDetails }) {
               ...(details.counterexample ? [{ id: 'counterexample' as const, label: 'First violating schedule' }] : []),
               ...(details.passingExample ? [{ id: 'passing' as const, label: 'First passing schedule' }] : []),
             ]}
-          />
-          {which === 'counterexample' && details.counterexample && <TraceView trace={details.counterexample} />}
-          {which === 'passing' && details.passingExample && <TraceView trace={details.passingExample} />}
+          >
+            {which === 'counterexample' && details.counterexample && <TraceView trace={details.counterexample} />}
+            {which === 'passing' && details.passingExample && <TraceView trace={details.passingExample} />}
+          </Tabs>
         </div>
       )}
       <p className="text-[12px] text-muted leading-relaxed">

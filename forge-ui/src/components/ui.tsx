@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ReactNode } from 'react'
+import type { ButtonHTMLAttributes, KeyboardEvent, ReactNode } from 'react'
 import { useId } from 'react'
 import type { LinkProps } from 'react-router'
 import { Link } from 'react-router'
@@ -158,27 +158,60 @@ export const inputClass =
 export const textareaClass =
   'w-full rounded-md border border-border bg-bg-elev px-2.5 py-2 text-[13px] text-text placeholder:text-muted focus:border-accent focus:outline-none leading-relaxed'
 
-export function Tabs<T extends string>({ tabs, value, onChange, label }: { tabs: { id: T; label: ReactNode }[]; value: T; onChange: (v: T) => void; label: string }) {
+/**
+ * WAI-ARIA tabs: one tab stop (the selected tab), arrow keys / Home / End move and select, and the
+ * children are the selected tab's panel, labelled by it. The tab row scrolls sideways when it does
+ * not fit instead of widening the page.
+ */
+export function Tabs<T extends string>({ tabs, value, onChange, label, children }: {
+  tabs: { id: T; label: ReactNode }[]
+  value: T
+  onChange: (v: T) => void
+  label: string
+  children?: ReactNode
+}) {
   const id = useId()
+  function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {
+    const i = tabs.findIndex((t) => t.id === value)
+    const next = e.key === 'ArrowRight' ? (i + 1) % tabs.length
+      : e.key === 'ArrowLeft' ? (i - 1 + tabs.length) % tabs.length
+        : e.key === 'Home' ? 0
+          : e.key === 'End' ? tabs.length - 1
+            : -1
+    if (next < 0) return
+    e.preventDefault()
+    onChange(tabs[next].id)
+    document.getElementById(`${id}-tab-${tabs[next].id}`)?.focus()
+  }
   return (
-    <div role="tablist" aria-label={label} className="flex gap-1 border-b border-border">
-      {tabs.map((t) => (
-        <button
-          key={t.id}
-          id={`${id}-${t.id}`}
-          role="tab"
-          aria-selected={value === t.id}
-          onClick={() => onChange(t.id)}
-          className={cx(
-            'relative h-9 px-3 text-[13px] font-medium transition-colors',
-            value === t.id ? 'text-text' : 'text-muted hover:text-dim',
-          )}
-        >
-          {t.label}
-          {value === t.id && <span className="absolute inset-x-2 -bottom-px h-0.5 rounded bg-accent" />}
-        </button>
-      ))}
-    </div>
+    <>
+      <div role="tablist" aria-label={label} onKeyDown={onKeyDown} className="flex gap-1 overflow-x-auto border-b border-border">
+        {tabs.map((t) => (
+          <button
+            key={t.id}
+            id={`${id}-tab-${t.id}`}
+            type="button"
+            role="tab"
+            aria-selected={value === t.id}
+            aria-controls={children === undefined ? undefined : `${id}-panel`}
+            tabIndex={value === t.id ? 0 : -1}
+            onClick={() => onChange(t.id)}
+            className={cx(
+              'relative h-9 shrink-0 whitespace-nowrap px-3 text-[13px] font-medium transition-colors',
+              value === t.id ? 'text-text' : 'text-muted hover:text-dim',
+            )}
+          >
+            {t.label}
+            {value === t.id && <span className="absolute inset-x-2 bottom-0 h-0.5 rounded bg-accent" />}
+          </button>
+        ))}
+      </div>
+      {children !== undefined && (
+        <div role="tabpanel" id={`${id}-panel`} aria-labelledby={`${id}-tab-${value}`} className="min-w-0">
+          {children}
+        </div>
+      )}
+    </>
   )
 }
 

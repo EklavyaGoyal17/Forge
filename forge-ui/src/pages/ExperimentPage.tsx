@@ -9,7 +9,7 @@ import { InvestigatorPanel } from '../components/InvestigatorPanel'
 import { ReviewPanel } from '../components/ReviewPanel'
 import { RunConfigForm } from '../components/RunConfigForm'
 import { RunDetail } from '../components/RunDetail'
-import { Badge, Button, Card, EmptyState, InvariantBadge, Markdownish, RoleBadge, StatusPill, Tabs, cx } from '../components/ui'
+import { Badge, Button, Card, EmptyState, InvariantBadge, Markdownish, QueryError, RoleBadge, StatusPill, Tabs, cx } from '../components/ui'
 import type { CreateRunRequest, Experiment, ExperimentStatus, RegressionCheck, Run, ScenarioDescriptor } from '../lib/api'
 import { ApiError, api } from '../lib/api'
 import { duration, fmt, relativeTime, runDuration } from '../lib/format'
@@ -59,21 +59,21 @@ export function ExperimentPage() {
           { id: 'report', label: 'Report' },
           { id: 'scenario', label: 'About this scenario' },
         ]}
-      />
-
-      {!d ? (
-        <p className="text-muted">Loading scenario…</p>
-      ) : (
-        <>
-          {tab === 'runs' && <RunsWorkbench experiment={experiment} runs={runs} descriptor={d} sources={scenario.data!.sources} />}
-          {tab === 'compare' && <Card><ComparePanel runs={runs} /></Card>}
-          {tab === 'investigate' && <InvestigatorPanel experimentId={experiment.id} runsKey={runsKey} />}
-          {tab === 'notebook' && <Card><NotebookPanel experiment={experiment} /></Card>}
-          {tab === 'review' && <Card><ReviewPanel experiment={experiment} runsKey={runsKey} /></Card>}
-          {tab === 'report' && <ReportView experiment={experiment} runsKey={runsKey} />}
-          {tab === 'scenario' && <ScenarioAbout descriptor={d} />}
-        </>
-      )}
+      >
+        {!d ? (
+          scenario.isError ? <QueryError error={scenario.error} what="the scenario" /> : <p className="text-muted">Loading scenario…</p>
+        ) : (
+          <>
+            {tab === 'runs' && <RunsWorkbench experiment={experiment} runs={runs} descriptor={d} sources={scenario.data!.sources} />}
+            {tab === 'compare' && <Card><ComparePanel runs={runs} /></Card>}
+            {tab === 'investigate' && <InvestigatorPanel experimentId={experiment.id} runsKey={runsKey} />}
+            {tab === 'notebook' && <Card><NotebookPanel experiment={experiment} /></Card>}
+            {tab === 'review' && <Card><ReviewPanel experiment={experiment} runsKey={runsKey} /></Card>}
+            {tab === 'report' && <ReportView experiment={experiment} runsKey={runsKey} />}
+            {tab === 'scenario' && <ScenarioAbout descriptor={d} />}
+          </>
+        )}
+      </Tabs>
     </div>
   )
 }

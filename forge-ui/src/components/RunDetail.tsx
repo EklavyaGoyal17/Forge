@@ -101,16 +101,17 @@ export function RunDetail({ runId, descriptor, pin }: { runId: string; descripto
           { id: 'environment', label: 'Environment' },
           { id: 'config', label: 'Configuration' },
         ]}
-      />
-      {tab === 'results' && <Results view={view.data} descriptor={descriptor} />}
-      {tab === 'timeline' && <Timeline runId={runId} active={active} />}
-      {tab === 'artifacts' && <Artifacts view={view.data} />}
-      {tab === 'environment' && <EnvironmentView view={view.data} />}
-      {tab === 'config' && (
-        <pre className="num overflow-x-auto rounded-md border border-border bg-code p-3 text-[12px]">
-          {JSON.stringify({ scenario: run.scenarioId, scenarioVersion: run.scenarioVersion, variant: run.variant, params: run.params, seed: run.seed, trials: run.trials, warmupTrials: run.warmupTrials, heapMb: run.heapMb, timeoutSeconds: run.timeoutSeconds, forgeVersion: run.forgeVersion }, null, 2)}
-        </pre>
-      )}
+      >
+        {tab === 'results' && <Results view={view.data} descriptor={descriptor} />}
+        {tab === 'timeline' && <Timeline runId={runId} active={active} />}
+        {tab === 'artifacts' && <Artifacts view={view.data} />}
+        {tab === 'environment' && <EnvironmentView view={view.data} />}
+        {tab === 'config' && (
+          <pre className="num overflow-x-auto rounded-md border border-border bg-code p-3 text-[12px]">
+            {JSON.stringify({ scenario: run.scenarioId, scenarioVersion: run.scenarioVersion, variant: run.variant, params: run.params, seed: run.seed, trials: run.trials, warmupTrials: run.warmupTrials, heapMb: run.heapMb, timeoutSeconds: run.timeoutSeconds, forgeVersion: run.forgeVersion }, null, 2)}
+          </pre>
+        )}
+      </Tabs>
     </div>
   )
 }

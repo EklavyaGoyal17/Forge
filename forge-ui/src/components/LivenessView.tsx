@@ -104,8 +104,9 @@ export function LivenessView({ details }: { details: LivenessDetails }) {
 
       {witnesses.length > 0 && current && (
         <div className="flex flex-col gap-3">
-          <Tabs label="Witnesses" value={current.id} onChange={setWhich} tabs={witnesses.map((w) => ({ id: w.id, label: w.label }))} />
-          {current.node}
+          <Tabs label="Witnesses" value={current.id} onChange={setWhich} tabs={witnesses.map((w) => ({ id: w.id, label: w.label }))}>
+            {current.node}
+          </Tabs>
         </div>
       )}
 
