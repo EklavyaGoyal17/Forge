@@ -87,7 +87,7 @@ export function RunConfigForm({ descriptor: d, sources, lastRun, onSubmit, submi
     <form onSubmit={submit} className="flex flex-col gap-5" noValidate aria-label="Run configuration">
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-1 text-[12px] font-medium text-dim">Variant</legend>
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
           {d.variants.map((v) => {
             const usable = supportsMode(v, values.mode)
             return (
@@ -143,7 +143,7 @@ export function RunConfigForm({ descriptor: d, sources, lastRun, onSubmit, submi
         </fieldset>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {visible.map((p) => (
           <Field key={p.name} label={`${p.label}${p.unit ? ` (${p.unit})` : ''}`} htmlFor={`p-${p.name}`} hint={`${p.description}${p.type === 'INTEGER' ? ` Range ${p.min?.toLocaleString()}–${p.max?.toLocaleString()}.` : ''}`} error={errorFor(`params.${p.name}`)}>
             {p.type === 'ENUM' ? (
@@ -169,7 +169,7 @@ export function RunConfigForm({ descriptor: d, sources, lastRun, onSubmit, submi
         ))}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {!exploreMode && (
           <>
             <Field label="Measured trials" htmlFor="trials" hint={`1–${d.trials.maxTrials}. ≥ 5 recommended for comparisons.`} error={errorFor('trials')}>
@@ -185,7 +185,7 @@ export function RunConfigForm({ descriptor: d, sources, lastRun, onSubmit, submi
         </Field>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <Field label="Role" htmlFor="role" hint="The review board compares the latest baseline with the latest candidate.">
           <select id="role" className={inputClass} value={role} onChange={(e) => setRole(e.target.value as RunRole)}>
             <option value="BASELINE">Baseline</option>

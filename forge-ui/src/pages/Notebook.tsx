@@ -21,7 +21,7 @@ export function NotebookPage() {
   }, [list.data])
 
   return (
-    <div className="mx-auto flex max-w-4xl flex-col gap-5 p-6">
+    <div className="mx-auto flex max-w-4xl flex-col gap-5 p-4 sm:p-6">
       <div>
         <h1 className="text-[22px] font-semibold tracking-tight">Experiment Notebook</h1>
         <p className="text-dim">Your archive of questions, hypotheses, decisions and evidence — comparable months apart because every run records its environment.</p>

@@ -31,7 +31,7 @@ export function Dashboard() {
   const h = system.data?.host
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 p-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 p-4 sm:p-6">
       <div>
         <h1 className="text-[24px] font-semibold tracking-tight">Don't just write software. Understand how it behaves.</h1>
         <p className="mt-1 max-w-3xl text-dim">
@@ -39,7 +39,7 @@ export function Dashboard() {
         </p>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         {SHOWCASES.map((s) => (
           <Card key={s.title}>
             <div className="flex h-full flex-col gap-3">
@@ -51,25 +51,35 @@ export function Dashboard() {
         ))}
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1.6fr_1fr]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
         <Card title="Recent runs" dense>
           {runs.data && runs.data.length > 0 ? (
-            <table className="w-full text-[13px]">
-              <tbody>
-                {runs.data.map((r) => (
-                  <tr key={r.id} className="border-t border-border first:border-t-0">
-                    <td className="px-4 py-2"><StatusPill status={r.status} /></td>
-                    <td className="px-2 py-2">
-                      <Link to={`/experiments/${r.experimentId}`} className="num hover:text-accent">{r.scenarioId}</Link>
-                      <span className="num text-muted"> / {r.variant}</span>
-                    </td>
-                    <td className="px-2 py-2 text-dim">{r.role.toLowerCase()}</td>
-                    <td className="num px-2 py-2 text-dim">{duration(runDuration(r.startedAt, r.finishedAt))}</td>
-                    <td className="px-4 py-2 text-right text-muted">{relativeTime(r.queuedAt)}</td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-[13px]">
+                <caption className="sr-only">The most recently queued runs</caption>
+                <thead className="text-left text-[11px] uppercase tracking-wider text-muted">
+                  <tr>
+                    {['Status', 'Scenario / variant', 'Role', 'Duration', 'Queued'].map((h, i) => (
+                      <th key={h} scope="col" className={i === 0 ? 'px-4 pt-2 pb-1 font-medium' : i === 4 ? 'px-4 pt-2 pb-1 text-right font-medium' : 'px-2 pt-2 pb-1 font-medium'}>{h}</th>
+                    ))}
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {runs.data.map((r) => (
+                    <tr key={r.id} className="border-t border-border">
+                      <td className="px-4 py-2"><StatusPill status={r.status} /></td>
+                      <td className="px-2 py-2">
+                        <Link to={`/experiments/${r.experimentId}`} className="num hover:text-accent">{r.scenarioId}</Link>
+                        <span className="num text-muted"> / {r.variant}</span>
+                      </td>
+                      <td className="px-2 py-2 text-dim">{r.role.toLowerCase()}</td>
+                      <td className="num whitespace-nowrap px-2 py-2 text-dim">{duration(runDuration(r.startedAt, r.finishedAt))}</td>
+                      <td className="whitespace-nowrap px-4 py-2 text-right text-muted">{relativeTime(r.queuedAt)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <EmptyState title="Nothing has run yet">Runs appear here as soon as they are queued.</EmptyState>
           )}

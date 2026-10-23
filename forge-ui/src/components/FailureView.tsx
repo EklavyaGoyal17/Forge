@@ -98,18 +98,20 @@ function Accounting({ trial }: { trial: FailureTrial }) {
     ['Received − sent', trial.receivedMinusSent, 'positive: the HTTP client resent requests itself; negative: attempts that never arrived (refused)'],
   ]
   return (
-    <table className="w-full border-collapse text-[12.5px]">
-      <caption className="sr-only">Request accounting for this trial</caption>
-      <tbody>
-        {rows.map(([label, value, note]) => (
-          <tr key={label} className="border-t border-border first:border-t-0">
-            <th scope="row" className="py-1 pr-3 text-left font-normal text-dim">{label}</th>
-            <td className="num py-1 pr-3 text-right">{fmt(value)}</td>
-            <td className="py-1 text-[11.5px] text-muted">{note}</td>
-          </tr>
-        ))}
-      </tbody>
-    </table>
+    <div className="overflow-x-auto">
+      <table className="w-full border-collapse text-[12.5px]">
+        <caption className="sr-only">Request accounting for this trial</caption>
+        <tbody>
+          {rows.map(([label, value, note]) => (
+            <tr key={label} className="border-t border-border first:border-t-0">
+              <th scope="row" className="py-1 pr-3 text-left font-normal text-dim">{label}</th>
+              <td className="num py-1 pr-3 text-right">{fmt(value)}</td>
+              <td className="py-1 text-[11.5px] text-muted">{note}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   )
 }
 

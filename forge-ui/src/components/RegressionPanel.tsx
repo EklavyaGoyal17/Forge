@@ -44,28 +44,30 @@ export function RegressionPanel({ report }: { report: RegressionReport }) {
           <p className={regressions > 0 ? 'text-bad' : 'text-dim'}>
             {regressions === 0 ? 'No regressions' : `${regressions} regression${regressions === 1 ? '' : 's'}`} among {report.checks.length} checked run{report.checks.length === 1 ? '' : 's'}.
           </p>
-          <table className="w-full text-[12.5px]">
-            <caption className="sr-only">Runs checked against the pinned baseline</caption>
-            <thead className="text-left text-[11px] uppercase tracking-wider text-muted">
-              <tr>
-                {['Run', 'Gate', 'Primary ratio', '95% CI', 'Why'].map((h) => <th key={h} scope="col" className="py-1 pr-3 font-medium">{h}</th>)}
-              </tr>
-            </thead>
-            <tbody>
-              {report.checks.map((c) => (
-                <tr key={c.runId} className="border-t border-border align-top">
-                  <th scope="row" className="num py-1.5 pr-3 text-left font-normal text-muted">#{c.seq} <span className="text-dim">{c.variant}</span></th>
-                  <td className="py-1.5 pr-3"><GateBadge check={c} /></td>
-                  <td className="num py-1.5 pr-3">{c.primary ? fmt(c.primary.ratioOfMedians) : '—'}</td>
-                  <td className="num py-1.5 pr-3">{c.primary ? `[${fmt(c.primary.ciLow)}, ${fmt(c.primary.ciHigh)}]` : '—'}</td>
-                  <td className="py-1.5 text-[12px] text-muted">
-                    {c.reasons.join(' ')}
-                    {c.otherRegressedMetrics.length > 0 && <span className="block text-warn">Also worse (not gating): {c.otherRegressedMetrics.join(', ')}.</span>}
-                  </td>
+          <div className="overflow-x-auto">
+            <table className="w-full text-[12.5px]">
+              <caption className="sr-only">Runs checked against the pinned baseline</caption>
+              <thead className="text-left text-[11px] uppercase tracking-wider text-muted">
+                <tr>
+                  {['Run', 'Gate', 'Primary ratio', '95% CI', 'Why'].map((h) => <th key={h} scope="col" className="py-1 pr-3 font-medium">{h}</th>)}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {report.checks.map((c) => (
+                  <tr key={c.runId} className="border-t border-border align-top">
+                    <th scope="row" className="num py-1.5 pr-3 text-left font-normal text-muted">#{c.seq} <span className="text-dim">{c.variant}</span></th>
+                    <td className="py-1.5 pr-3"><GateBadge check={c} /></td>
+                    <td className="num py-1.5 pr-3">{c.primary ? fmt(c.primary.ratioOfMedians) : '—'}</td>
+                    <td className="num py-1.5 pr-3">{c.primary ? `[${fmt(c.primary.ciLow)}, ${fmt(c.primary.ciHigh)}]` : '—'}</td>
+                    <td className="py-1.5 text-[12px] text-muted">
+                      {c.reasons.join(' ')}
+                      {c.otherRegressedMetrics.length > 0 && <span className="block text-warn">Also worse (not gating): {c.otherRegressedMetrics.join(', ')}.</span>}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
           <p className="text-[11px] text-muted">
             A run is a regression only if it is comparable with the baseline (same parameters, scenario version and environment) and the 95% bootstrap
             interval of the primary metric excludes 1.0 on the worse side — or if it violates an invariant the baseline held.

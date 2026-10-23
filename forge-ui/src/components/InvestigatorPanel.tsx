@@ -110,7 +110,7 @@ export function InvestigatorPanel({ experimentId, runsKey }: { experimentId: str
   const byKind = (k: FindingKind) => a.findings.filter((f: Finding) => f.kind === k)
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.2fr)_minmax(0,1fr)]">
       <div className="flex flex-col gap-5">
         <Card title="Ask about this experiment">
           <p className="mb-2 text-[12.5px] text-dim">{a.provider.description}</p>

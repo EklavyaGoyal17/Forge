@@ -64,7 +64,7 @@ export function LabPage({ lab }: { lab: Lab }) {
   const intro = LAB_INTRO[lab]
 
   return (
-    <div className="mx-auto flex max-w-7xl flex-col gap-6 p-6">
+    <div className="mx-auto flex max-w-7xl flex-col gap-6 p-4 sm:p-6">
       <div>
         <h1 className="text-[22px] font-semibold tracking-tight">{module.label}</h1>
         <p className="text-dim">{module.blurb}</p>
@@ -76,7 +76,7 @@ export function LabPage({ lab }: { lab: Lab }) {
           </ul>
         </Card>
       )}
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {list.map((s) => (
           <Card key={s.id}>
             <div className="flex h-full flex-col gap-3">

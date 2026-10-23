@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronDown, ChevronRight, Download, Pin, Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import { ComparePanel } from '../components/ComparePanel'
 import { NotebookPanel } from '../components/NotebookPanel'
@@ -36,14 +36,14 @@ export function ExperimentPage() {
     staleTime: Infinity,
   })
 
-  if (exp.isLoading) return <p className="p-6 text-muted">Loading experiment…</p>
+  if (exp.isLoading) return <p className="p-4 sm:p-6 text-muted">Loading experiment…</p>
   if (exp.isError || !exp.data) return <EmptyState title="Experiment not found">It may have been deleted. <Link className="text-accent" to="/experiments">All experiments</Link></EmptyState>
   const { experiment, runs } = exp.data
   const d = scenario.data?.descriptor
   const runsKey = runs.map((r) => `${r.id}:${r.status}`).join(',')
 
   return (
-    <div className="mx-auto flex max-w-[1500px] flex-col gap-5 p-6">
+    <div className="mx-auto flex max-w-[1500px] flex-col gap-5 p-4 sm:p-6">
       <Header experiment={experiment} descriptor={d} onChanged={() => qc.invalidateQueries({ queryKey: ['experiment', id] })} hasActive={runs.some((r) => r.status === 'QUEUED' || r.status === 'RUNNING')} />
 
       <Tabs<Tab>
@@ -87,7 +87,7 @@ function Header({ experiment, descriptor, onChanged, hasActive }: { experiment: 
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-start gap-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-0 flex-1 basis-64">
           <div className="flex flex-wrap items-center gap-2 text-[12px] text-muted">
             {descriptor && <Badge tone="accent">{LAB_LABEL[descriptor.lab]}</Badge>}
             <span className="num">{experiment.scenarioId}</span>
@@ -123,7 +123,7 @@ function Header({ experiment, descriptor, onChanged, hasActive }: { experiment: 
           {hypOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />} Question & hypothesis
         </button>
         {hypOpen && (
-          <div className="grid gap-4 border-t border-border p-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 border-t border-border p-4 md:grid-cols-2">
             <div>
               <h3 className="mb-1 text-[11px] uppercase tracking-wider text-muted">Engineering question</h3>
               <p className="leading-relaxed text-dim">{experiment.question || <span className="text-muted">Not recorded.</span>}</p>
@@ -171,9 +171,17 @@ function RunsWorkbench({ experiment, runs, descriptor, sources }: { experiment: 
   })
   const checks = new Map((pinnedId ? regressions.data?.checks ?? [] : []).map((c) => [c.runId, c]))
   const selectedRun = runs.find((r) => r.id === selected)
+  const evidence = useRef<HTMLDivElement>(null)
+  // in the one-column layout the evidence is below the whole run list: bring it into view
+  const select = (id: string) => {
+    setSelected(id)
+    if (window.matchMedia?.('(max-width: 1279.98px)').matches) {
+      requestAnimationFrame(() => evidence.current?.scrollIntoView?.({ block: 'start', behavior: 'smooth' }))
+    }
+  }
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(420px,0.85fr)_1.4fr]">
+    <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(420px,0.85fr)_minmax(0,1.4fr)]">
       <div className="flex flex-col gap-5">
         <Card
           title="Runs"
@@ -199,25 +207,27 @@ function RunsWorkbench({ experiment, runs, descriptor, sources }: { experiment: 
               Start with a <strong>baseline</strong>: the implementation you want to improve. Then run the candidate with identical parameters so that the variant is the only difference.
             </EmptyState>
           ) : (
-            <RunList runs={runs} descriptor={descriptor} selected={selected} onSelect={setSelected} pinnedId={pinnedId} checks={checks} />
+            <RunList runs={runs} descriptor={descriptor} selected={selected} onSelect={select} pinnedId={pinnedId} checks={checks} />
           )}
           {pinnedId && regressions.data && <div className="border-t border-border"><RegressionPanel report={regressions.data} /></div>}
         </Card>
       </div>
-      <Card title={selected ? 'Evidence' : undefined}>
-        {selected ? (
-          <RunDetail
-            key={selected}
-            runId={selected}
-            descriptor={descriptor}
-            pin={selectedRun?.status === 'SUCCEEDED' ? {
-              pinned: pinnedId === selected,
-              busy: pin.isPending,
-              onToggle: () => pin.mutate(pinnedId === selected ? null : selected),
-            } : undefined}
-          />
-        ) : <EmptyState title="Select a run">Each run's measurements, timeline, raw artifacts and environment appear here.</EmptyState>}
-      </Card>
+      <div ref={evidence} className="min-w-0 scroll-mt-4">
+        <Card title={selected ? 'Evidence' : undefined}>
+          {selected ? (
+            <RunDetail
+              key={selected}
+              runId={selected}
+              descriptor={descriptor}
+              pin={selectedRun?.status === 'SUCCEEDED' ? {
+                pinned: pinnedId === selected,
+                busy: pin.isPending,
+                onToggle: () => pin.mutate(pinnedId === selected ? null : selected),
+              } : undefined}
+            />
+          ) : <EmptyState title="Select a run">Each run's measurements, timeline, raw artifacts and environment appear here.</EmptyState>}
+        </Card>
+      </div>
     </div>
   )
 }
@@ -241,14 +251,14 @@ function RunList({ runs, descriptor, selected, onSelect, pinnedId, checks }: { r
             >
               <span className="num text-[12px] text-muted">#{r.seq}</span>
               <span className="min-w-0">
-                <span className="flex items-center gap-2">
+                <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="num truncate text-[13px]">{r.variant}</span>
                   <RoleBadge role={r.role} />
                   {explore && <Badge>explore</Badge>}
                   {pinnedId === r.id && <span className="inline-flex items-center gap-1 text-[11px] text-info" title="Pinned regression baseline"><Pin size={11} aria-hidden /> pinned baseline</span>}
                   {checks.get(r.id) && <GateBadge check={checks.get(r.id)!} />}
                 </span>
-                <span className="mt-0.5 flex items-center gap-2 text-[12px] text-muted">
+                <span className="mt-0.5 flex flex-wrap items-center gap-x-2 text-[12px] text-muted [&>span]:whitespace-nowrap">
                   {r.status === 'SUCCEEDED' && !explore && median !== undefined && primary && <span className="num">{fmt(median)} {primary.unit} median</span>}
                   {r.status === 'SUCCEEDED' && explore && r.result?.details.explorer && <span className="num">{r.result.details.explorer.violations}/{r.result.details.explorer.schedulesExplored} schedules violate</span>}
                   <span>{duration(runDuration(r.startedAt, r.finishedAt))}</span>
@@ -288,7 +298,7 @@ function ReportView({ experiment, runsKey }: { experiment: Experiment; runsKey: 
 
 function ScenarioAbout({ descriptor: d }: { descriptor: ScenarioDescriptor }) {
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.4fr_1fr]">
+    <div className="grid grid-cols-1 gap-5 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
       <Card title={d.title}>
         <div className="flex flex-col gap-4">
           <p className="text-dim">{d.summary}</p>

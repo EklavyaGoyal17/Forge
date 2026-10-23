@@ -84,7 +84,7 @@ function RecordingLine({ jfr }: { jfr: JfrSummary }) {
         {r.windowStartMs !== null && r.windowEndMs !== null && <> Tables cover the measured window {fmt(Math.round(r.windowStartMs))}–{fmt(Math.round(r.windowEndMs))} ms.</>}
         {r.truncatedTables.length > 0 && <> Row-capped tables: {r.truncatedTables.join(', ')}.</>}
       </summary>
-      <div className="mt-2 grid gap-3 sm:grid-cols-2">
+      <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <table className="text-[12px]">
           <caption className="text-left text-muted">Settings</caption>
           <tbody>{Object.entries(r.settings).map(([k, v]) => <tr key={k}><th scope="row" className="pr-3 text-left font-normal">{k}</th><td className="num text-dim">{v}</td></tr>)}</tbody>
@@ -226,7 +226,7 @@ function CpuSection({ jfr }: { jfr: JfrSummary }) {
       <SectionTitle note={`${fmt(cpu.samples)} jdk.ExecutionSample stacks, one every ${fmt(cpu.periodMs)} ms per thread running Java code. Shares are of samples, not of exact time.`}>
         Hot methods
       </SectionTitle>
-      <div className="grid gap-3 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <div className="overflow-x-auto rounded-md border border-border">
           <table className="w-full text-[12.5px]">
             <caption className="px-2.5 py-1.5 text-left text-[12px] text-muted">Top of stack (self): where the CPU was</caption>
@@ -274,7 +274,7 @@ function CpuSection({ jfr }: { jfr: JfrSummary }) {
               </div>
               <ul className="mt-1 flex flex-col">
                 {p.frames.map((f, i) => (
-                  <li key={i} className={cx('num text-[12px]', i === 0 ? 'text-text' : 'text-muted')} style={{ paddingLeft: `${i * 10}px` }} title={f}>
+                  <li key={i} className={cx('num text-[12px] wrap-anywhere', i === 0 ? 'text-text' : 'text-muted')} style={{ paddingLeft: `${i * 10}px` }} title={f}>
                     {i > 0 && '↳ '}{shortFrame(f)}
                   </li>
                 ))}
@@ -303,7 +303,7 @@ function AllocationSection({ jfr, exactBytes }: { jfr: JfrSummary; exactBytes?: 
       {a.samples === 0 ? (
         <p className="text-[12.5px] text-muted">No allocation samples in the measured window.</p>
       ) : (
-        <div className="grid gap-3 lg:grid-cols-[2fr_3fr]">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
           <div className="overflow-x-auto rounded-md border border-border">
             <table className="w-full text-[12.5px]">
               <caption className="px-2.5 py-1.5 text-left text-[12px] text-muted">By class</caption>

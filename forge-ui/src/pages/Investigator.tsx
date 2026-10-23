@@ -19,7 +19,7 @@ export function InvestigatorPage() {
   const chosen = list.data?.find((e) => e.experiment.id === selected)?.experiment
 
   return (
-    <div className="mx-auto flex max-w-[1500px] flex-col gap-5 p-6">
+    <div className="mx-auto flex max-w-[1500px] flex-col gap-5 p-4 sm:p-6">
       <div>
         <h1 className="text-[22px] font-semibold tracking-tight">AI Investigator</h1>
         <p className="max-w-3xl text-dim">
@@ -33,7 +33,7 @@ export function InvestigatorPage() {
           </p>
         )}
       </div>
-      <div className="grid gap-5 lg:grid-cols-[18rem_minmax(0,1fr)]">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-[18rem_minmax(0,1fr)]">
         <Card title="Experiments">
           <div className="relative mb-2">
             <Search size={14} className="absolute left-2 top-2.5 text-muted" aria-hidden />

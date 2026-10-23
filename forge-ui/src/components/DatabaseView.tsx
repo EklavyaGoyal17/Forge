@@ -3,7 +3,7 @@ import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, X
 import type { DatabaseDetails, ExplainCapture, PlanNode } from '../lib/api'
 import { fmt } from '../lib/format'
 import { axisTick, tooltipLabelStyle, tooltipStyle } from './charts'
-import { CodeBlock, cx } from './ui'
+import { CodeBlock } from './ui'
 
 export interface PlanRow {
   depth: number
@@ -188,22 +188,24 @@ function DepthSweep({ sweep }: { sweep: NonNullable<DatabaseDetails['sweep']> })
           </LineChart>
         </ResponsiveContainer>
       </figure>
-      <table className={cx('w-full text-[12.5px]')}>
-        <caption className="sr-only">Page depth sweep values</caption>
-        <thead className="text-left text-[11px] uppercase tracking-wider text-muted">
-          <tr>{['Page', 'Median page time (ms)', 'Rows read by scans', 'Server execution (ms)'].map((h) => <th key={h} scope="col" className="py-1 pr-3 font-medium">{h}</th>)}</tr>
-        </thead>
-        <tbody>
-          {sweep.map((s) => (
-            <tr key={s.page} className="border-t border-border">
-              <th scope="row" className="num py-1 pr-3 text-left font-normal">{fmt(s.page)}</th>
-              <td className="num py-1 pr-3">{fmt(s.medianMs)}</td>
-              <td className="num py-1 pr-3">{fmt(s.rowsScanned)}</td>
-              <td className="num py-1 pr-3">{fmt(s.explainExecutionMs)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <div className="overflow-x-auto">
+        <table className="w-full text-[12.5px]">
+          <caption className="sr-only">Page depth sweep values</caption>
+          <thead className="text-left text-[11px] uppercase tracking-wider text-muted">
+            <tr>{['Page', 'Median page time (ms)', 'Rows read by scans', 'Server execution (ms)'].map((h) => <th key={h} scope="col" className="py-1 pr-3 font-medium">{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {sweep.map((s) => (
+              <tr key={s.page} className="border-t border-border">
+                <th scope="row" className="num py-1 pr-3 text-left font-normal">{fmt(s.page)}</th>
+                <td className="num py-1 pr-3">{fmt(s.medianMs)}</td>
+                <td className="num py-1 pr-3">{fmt(s.rowsScanned)}</td>
+                <td className="num py-1 pr-3">{fmt(s.explainExecutionMs)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
       <p className="text-[11px] text-muted">Five fetches per depth after the measured trials; a few points, not a benchmark of its own.</p>
     </div>
   )

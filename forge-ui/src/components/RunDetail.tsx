@@ -164,9 +164,9 @@ function Results({ view, descriptor }: { view: RunView; descriptor: ScenarioDesc
 
       {!explorer && !liveness && chosen && (
         <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <label htmlFor="metric" className="text-[12px] text-muted">Metric</label>
-            <select id="metric" value={chosen} onChange={(e) => setMetric(e.target.value)} className="h-7 rounded-md border border-border bg-bg-elev px-2 text-[12.5px]">
+            <select id="metric" value={chosen} onChange={(e) => setMetric(e.target.value)} className="h-7 max-w-full rounded-md border border-border bg-bg-elev px-2 text-[12.5px]">
               {metricNames.map((m) => <option key={m} value={m}>{descriptor.metrics.find((x) => x.name === m)?.label ?? m}{m === descriptor.primaryMetric ? ' (primary)' : ''}</option>)}
             </select>
             {spec && <span className="text-[12px] text-muted">{spec.description}</span>}
@@ -325,8 +325,8 @@ function EnvironmentView({ view }: { view: RunView }) {
         <tbody>
           {rows.map(([k, v]) => (
             <tr key={k} className="border-t border-border first:border-t-0">
-              <th scope="row" className="w-56 py-1.5 pr-3 text-left font-normal text-muted">{k}</th>
-              <td className="num py-1.5 text-dim">{v === undefined || v === null || v === '' ? '—' : String(v)}</td>
+              <th scope="row" className="w-36 py-1.5 pr-3 text-left align-top font-normal text-muted sm:w-56">{k}</th>
+              <td className="num break-all py-1.5 text-dim">{v === undefined || v === null || v === '' ? '—' : String(v)}</td>
             </tr>
           ))}
         </tbody>

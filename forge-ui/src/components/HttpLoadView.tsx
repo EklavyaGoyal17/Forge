@@ -202,7 +202,7 @@ export function HttpLoadView({ details }: { details: HttpLoadDetails }) {
 export function WorkerThreads({ profile, workers }: { profile: WorkerThreadProfile; workers: number }) {
   const states = Object.entries(profile.states)
   return (
-    <div className="grid gap-4 rounded-md border border-border p-3 md:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 rounded-md border border-border p-3 md:grid-cols-2">
       <div>
         <h5 className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted">Worker thread states</h5>
         <p className="mb-2 text-[12px] text-muted">
@@ -222,17 +222,19 @@ export function WorkerThreads({ profile, workers }: { profile: WorkerThreadProfi
       </div>
       <div>
         <h5 className="mb-1 text-[11px] font-medium uppercase tracking-wider text-muted">Where they were</h5>
-        <table className="w-full text-[12.5px]">
-          <caption className="sr-only">Most frequent top frames of worker threads</caption>
-          <tbody>
-            {profile.topFrames.map((f) => (
-              <tr key={f.frame} className="border-t border-border first:border-t-0">
-                <td className="num py-1 pr-2 text-dim">{f.frame}</td>
-                <td className="num py-1 text-right">{(100 * f.share).toFixed(1)}%</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full text-[12.5px]">
+            <caption className="sr-only">Most frequent top frames of worker threads</caption>
+            <tbody>
+              {profile.topFrames.map((f) => (
+                <tr key={f.frame} className="border-t border-border first:border-t-0">
+                  <td className="num py-1 pr-2 text-dim">{f.frame}</td>
+                  <td className="num py-1 text-right">{(100 * f.share).toFixed(1)}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   )

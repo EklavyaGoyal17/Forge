@@ -29,7 +29,7 @@ export function ReviewPanel({ experiment, runsKey }: { experiment: Experiment; r
 
       <ul className="flex flex-col divide-y divide-border rounded-md border border-border">
         {r.checks.map((c) => (
-          <li key={c.id} className="grid gap-1 p-3 sm:grid-cols-[6.5rem_1fr]">
+          <li key={c.id} className="grid grid-cols-1 gap-1 p-3 sm:grid-cols-[6.5rem_1fr]">
             <span><Badge tone={CHECK_TONE[c.status]}>{titleCase(c.status)}</Badge></span>
             <div>
               <p className="text-[13px] font-medium">{c.criterion}</p>

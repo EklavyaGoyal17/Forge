@@ -17,7 +17,7 @@ function progress(a: AttemptView | null) {
 export function ChallengesPage() {
   const list = useQuery({ queryKey: ['challenges'], queryFn: api.challenges })
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-5 p-6">
+    <div className="mx-auto flex max-w-6xl flex-col gap-5 p-4 sm:p-6">
       <div>
         <h1 className="text-[22px] font-semibold tracking-tight">Challenge Arena</h1>
         <p className="max-w-3xl text-dim">
@@ -26,7 +26,7 @@ export function ChallengesPage() {
           self-assessment.
         </p>
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         {(list.data ?? []).map(({ challenge: c, latest, attempts, everCompleted }) => (
           <Link key={c.id} to={`/challenges/${c.id}`} className="block rounded-lg focus-visible:outline-2">
             <Card className="h-full transition-colors hover:border-accent">
@@ -145,8 +145,8 @@ export function ChallengePage() {
   const qc = useQueryClient()
   const data = useQuery({ queryKey: ['challenge', id], queryFn: () => api.challenge(id) })
   const [restart, setRestart] = useState(false)
-  if (data.isLoading) return <p className="p-6 text-muted">Loading…</p>
-  if (!data.data) return <div className="p-6"><Card><EmptyState title="No such challenge"><Link to="/challenges" className="text-accent">All challenges</Link></EmptyState></Card></div>
+  if (data.isLoading) return <p className="p-4 sm:p-6 text-muted">Loading…</p>
+  if (!data.data) return <div className="p-4 sm:p-6"><Card><EmptyState title="No such challenge"><Link to="/challenges" className="text-accent">All challenges</Link></EmptyState></Card></div>
   const { challenge: c, attempts } = data.data
   const latest = attempts[0]
   const started = () => {
@@ -155,7 +155,7 @@ export function ChallengePage() {
     qc.invalidateQueries({ queryKey: ['challenges'] })
   }
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-5 p-6">
+    <div className="mx-auto flex max-w-5xl flex-col gap-5 p-4 sm:p-6">
       <div>
         <Link to="/challenges" className="text-[12px] text-accent hover:underline">← Challenge Arena</Link>
         <h1 className="mt-1 text-[22px] font-semibold tracking-tight">#{c.number} {c.title}</h1>

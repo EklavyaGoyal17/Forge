@@ -13,7 +13,7 @@ export function ExperimentsPage() {
   const [lab, setLab] = useState('')
   const list = useQuery({ queryKey: ['experiments', q, lab], queryFn: () => api.experiments(q, lab) })
   return (
-    <div className="mx-auto flex max-w-6xl flex-col gap-5 p-6">
+    <div className="mx-auto flex max-w-6xl flex-col gap-5 p-4 sm:p-6">
       <div className="flex flex-wrap items-end gap-3">
         <div className="flex-1">
           <h1 className="text-[22px] font-semibold tracking-tight">Experiments</h1>
@@ -117,7 +117,7 @@ export function NewExperimentPage() {
   const fieldError = (f: string) => (create.error instanceof ApiError ? create.error.fieldErrors.find((e) => e.field === f)?.message : undefined)
 
   return (
-    <div className="mx-auto flex max-w-5xl flex-col gap-5 p-6">
+    <div className="mx-auto flex max-w-5xl flex-col gap-5 p-4 sm:p-6">
       <div>
         <h1 className="text-[22px] font-semibold tracking-tight">New experiment</h1>
         <p className="text-dim">Hypothesis → configuration → execution → measurement → analysis → improvement → comparison.</p>
@@ -127,7 +127,7 @@ export function NewExperimentPage() {
           {byLab.map(([lab, list]) => (
             <fieldset key={lab}>
               <legend className="mb-2 text-[12px] font-medium text-muted">{LAB_LABEL[lab]}</legend>
-              <div className="grid gap-2 md:grid-cols-2">
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
                 {list.map((s) => (
                   <label key={s.id} className={cx('flex cursor-pointer flex-col gap-1 rounded-md border p-3', scenarioId === s.id ? 'border-accent bg-accent-soft' : 'border-border hover:border-border-strong')}>
                     <span className="flex items-center gap-2">
