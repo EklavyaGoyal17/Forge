@@ -300,8 +300,8 @@ public final class NPlusOneScenario implements Scenario {
             double[] rtts = trials.stream().mapToDouble(x -> x.metrics().get("roundTripMs")).sorted().toArray();
             Trial first = trials.get(0);
             double queries = first.metrics().get("queriesPerLoad");
-            double rttMedian = IndexLookupScenario.median(rtts);
-            double medianLoad = IndexLookupScenario.median(medians);
+            double rttMedian = Summary.median(rtts);
+            double medianLoad = Summary.median(medians);
             result.observation(String.format("%.0f statements per load of %d accounts and %.0f transactions; median load %.3f ms across %d trials (per-trial medians %.3f–%.3f ms).",
                     queries, accounts, first.metrics().get("rowsPerLoad"), medianLoad, trials.size(), medians[0], medians[medians.length - 1]));
             result.observation(String.format("Median round trip of a trivial statement: %.3f ms. %.0f statements × %.3f ms = %.3f ms, i.e. %.0f%% of the median load time is the floor of round trips alone.",

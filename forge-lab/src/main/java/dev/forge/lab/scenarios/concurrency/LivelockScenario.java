@@ -15,9 +15,9 @@ import dev.forge.lab.scenario.ScenarioResult;
 import dev.forge.lab.scenario.ScenarioResult.InvariantSummary;
 import dev.forge.lab.scenario.ScenarioResult.Trial;
 import dev.forge.lab.scenario.VariantSpec;
+import dev.forge.lab.stats.Summary;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -352,7 +352,7 @@ public final class LivelockScenario implements Scenario {
         double[] backoffs = values(result.trials(), "backoffsPerEntry");
         result.observation("Invariant violated in " + inv.violations() + " of " + inv.checked() + " measured trials.");
         result.observation(String.format("Median across trials: %.0f entries/s, longest wait %.3f ms, smaller thread's share %.1f%%, %.2f back-offs per entry.",
-                median(rate), median(wait), median(share), median(backoffs)));
+                Summary.median(rate), Summary.median(wait), Summary.median(share), Summary.median(backoffs)));
         if (!"peterson".equals(spec.variant())) {
             result.observation("On real cores, timing noise breaks the lockstep that a livelock needs, so stress trials usually finish. Run explorer mode for the schedule that never ends.");
         }
@@ -406,14 +406,5 @@ public final class LivelockScenario implements Scenario {
     static double[] values(List<Trial> trials, String metric) {
         return trials.stream().map(t -> t.metrics().get(metric)).filter(v -> v != null && Double.isFinite(v))
                 .mapToDouble(Double::doubleValue).sorted().toArray();
-    }
-
-    static double median(double[] sorted) {
-        if (sorted.length == 0) {
-            return Double.NaN;
-        }
-        double[] s = sorted.clone();
-        Arrays.sort(s);
-        return (s[(s.length - 1) / 2] + s[s.length / 2]) / 2;
     }
 }

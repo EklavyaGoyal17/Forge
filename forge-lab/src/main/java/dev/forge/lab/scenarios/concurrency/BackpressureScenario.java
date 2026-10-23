@@ -15,6 +15,7 @@ import dev.forge.lab.scenario.ScenarioResult;
 import dev.forge.lab.scenario.ScenarioResult.InvariantSummary;
 import dev.forge.lab.scenario.ScenarioResult.Trial;
 import dev.forge.lab.scenario.VariantSpec;
+import dev.forge.lab.stats.Summary;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -412,18 +413,11 @@ public final class BackpressureScenario implements Scenario {
         double[] lag = result.trials().stream().mapToDouble(x -> x.metrics().get("producerLagMs")).sorted().toArray();
         double[] tput = result.trials().stream().mapToDouble(x -> x.metrics().get("throughputPerSec")).sorted().toArray();
         result.observation(String.format("Median across trials: p99 latency %.1f ms, peak buffered %.0f items (capacity %d), dropped %.1f%%, producer lag %.1f ms, throughput %.0f items/s.",
-                median(p99), median(depth), capacity, median(dropped), median(lag), median(tput)));
-        if (median(lag) > 10 && "blocking".equals(spec.variant())) {
+                Summary.median(p99), Summary.median(depth), capacity, Summary.median(dropped), Summary.median(lag), Summary.median(tput)));
+        if (Summary.median(lag) > 10 && "blocking".equals(spec.variant())) {
             result.observation("Producers ended behind schedule: backpressure bounded the buffer, and the waiting appears as producer lag and latency measured from the intended emission time.");
         }
         return result.build();
-    }
-
-    private static double median(double[] sorted) {
-        if (sorted.length == 0) {
-            return Double.NaN;
-        }
-        return (sorted[(sorted.length - 1) / 2] + sorted[sorted.length / 2]) / 2;
     }
 
     private static final class TrialOutcome {

@@ -17,6 +17,7 @@ import dev.forge.lab.scenario.ScenarioResult;
 import dev.forge.lab.scenario.ScenarioResult.Trial;
 import dev.forge.lab.scenario.VariantSpec;
 import dev.forge.lab.scenarios.performance.TargetService.Design;
+import dev.forge.lab.stats.Summary;
 import org.HdrHistogram.Histogram;
 
 import java.io.IOException;
@@ -373,8 +374,8 @@ public final class GeneratorCrossCheckScenario implements Scenario {
 
     private static double median(List<Trial> trials, String metric) {
         double[] v = trials.stream().map(t -> t.metrics().get(metric)).filter(x -> x != null && Double.isFinite(x))
-                .mapToDouble(Double::doubleValue).sorted().toArray();
-        return v.length == 0 ? Double.NaN : (v[(v.length - 1) / 2] + v[v.length / 2]) / 2;
+                .mapToDouble(Double::doubleValue).toArray();
+        return Summary.median(v);
     }
 
     private static String tail(String s) {

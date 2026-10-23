@@ -37,6 +37,16 @@ class StatsTest {
     }
 
     @Test
+    void medianOfUnsortedSampleLeavesItUntouched() {
+        double[] odd = {9, 1, 5};
+        double[] even = {4, 1, 3, 2};
+        assertThat(Summary.median(odd)).isEqualTo(5);
+        assertThat(Summary.median(even)).isEqualTo(2.5);
+        assertThat(odd).containsExactly(9, 1, 5);
+        assertThat(Summary.median(new double[0])).isNaN();
+    }
+
+    @Test
     void normalCdfKnownValues() {
         assertThat(Normal.cdf(0)).isCloseTo(0.5, within(1e-7));
         assertThat(Normal.cdf(1.959964)).isCloseTo(0.975, within(1e-6));

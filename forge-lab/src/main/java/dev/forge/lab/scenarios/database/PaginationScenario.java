@@ -206,7 +206,7 @@ public final class PaginationScenario implements Scenario {
             result.invariant(inv);
             double[] medians = trials.stream().mapToDouble(x -> x.metrics().get("medianPageMs")).sorted().toArray();
             result.observation(String.format("%s pages %d–%d of %d rows: median %.3f ms per page across %d trials (per-trial medians %.3f–%.3f ms).",
-                    keyset ? "Keyset" : "OFFSET", startPage, lastPage, pageSize, IndexLookupScenario.median(medians), trials.size(),
+                    keyset ? "Keyset" : "OFFSET", startPage, lastPage, pageSize, Summary.median(medians), trials.size(),
                     medians[0], medians[medians.length - 1]));
             result.observation(String.format("For page %d, scan nodes produced %.0f rows to return %d.", startPage,
                     trials.get(0).metrics().get("rowsScanned"), pageSize));

@@ -264,7 +264,7 @@ public final class SqlLostUpdateScenario implements Scenario {
             result.observation("No deposit was lost in these trials, although this pattern is racy: the interleaving that loses one did not happen here — that does not mean it cannot.");
         }
         result.observation(String.format("Median throughput %.1f deposits/s; serialization-failure retries per trial %.0f–%.0f.",
-                IndexLookupScenario.median(tput), retries[0], retries[retries.length - 1]));
+                Summary.median(tput), retries[0], retries[retries.length - 1]));
         return result.build();
     }
 

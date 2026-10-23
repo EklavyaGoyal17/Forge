@@ -17,6 +17,7 @@ import dev.forge.lab.scenario.ScenarioResult;
 import dev.forge.lab.scenario.ScenarioResult.Trial;
 import dev.forge.lab.scenario.VariantSpec;
 import dev.forge.lab.scenarios.performance.TargetService.Design;
+import dev.forge.lab.stats.Summary;
 import org.HdrHistogram.Histogram;
 
 import java.net.http.HttpClient;
@@ -404,15 +405,15 @@ public final class ThreadPoolStarvationScenario implements Scenario {
         }
         double[] achieved = values(trials, "achievedRps");
         result.observation(String.format("Offered %.0f req/s; achieved a median of %.1f req/s across %d trials (range %.1f–%.1f).",
-                rate, median(achieved), trials.size(), achieved[0], achieved[achieved.length - 1]));
+                rate, Summary.median(achieved), trials.size(), achieved[0], achieved[achieved.length - 1]));
 
         double[] bounds = values(trials, "littleBoundRps");
         double[] occupancy = values(trials, "occupancyMs");
         if (workers > 0 && bounds.length > 0) {
-            double bound = median(bounds);
+            double bound = Summary.median(bounds);
             result.observation(String.format(
                     "Little's law: %d workers ÷ %.2f ms of worker time per request (median) ⇒ at most %.0f req/s. The offered rate was %.0f%% of that bound.",
-                    workers, median(occupancy), bound, 100.0 * rate / bound));
+                    workers, Summary.median(occupancy), bound, 100.0 * rate / bound));
         } else if (workers == 0) {
             result.observation("Virtual threads: no fixed pool, so no Little's-law bound from pool size; concurrency was limited by the client's connection limit.");
         }
@@ -421,7 +422,7 @@ public final class ThreadPoolStarvationScenario implements Scenario {
         double[] p50 = values(trials, "latencyP50Ms");
         if (p99.length > 0) {
             result.observation(String.format("Client latency from the intended send time: median of per-trial p50 %.2f ms, p99 %.2f ms (p99 range %.2f–%.2f ms).",
-                    median(p50), median(p99), p99[0], p99[p99.length - 1]));
+                    Summary.median(p50), Summary.median(p99), p99[0], p99[p99.length - 1]));
             long capped = Arrays.stream(p99).filter(v -> v >= timeoutMs).count();
             if (capped > 0) {
                 result.observation(String.format(
@@ -460,18 +461,18 @@ public final class ThreadPoolStarvationScenario implements Scenario {
         double[] lag = values(trials, "timerLagP99Ms");
         if (lag.length > 0) {
             result.observation(String.format(
-                    "The generator's timer woke up late by up to %.2f ms at p99 (median across trials); that lateness is part of client latency.", median(lag)));
+                    "The generator's timer woke up late by up to %.2f ms at p99 (median across trials); that lateness is part of client latency.", Summary.median(lag)));
         }
         double[] cpu = values(trials, "cpuUtilizationPercent");
         double[] blocked = values(trials, "workersBlockedPercent");
         double[] idle = values(trials, "workersIdlePercent");
         if (cpu.length > 0) {
             result.observation(String.format("The runner process used %.1f%% of its CPU capacity during the sustained phase (median across trials; client, server and GC together).",
-                    median(cpu)));
+                    Summary.median(cpu)));
         }
         if (blocked.length > 0) {
             result.observation(String.format("Worker-thread samples (wall clock, median across trials): %.1f%% inside a request but not running, %.1f%% idle waiting for a request, the rest running. The trial details list the frames.",
-                    median(blocked), median(idle)));
+                    Summary.median(blocked), Summary.median(idle)));
         }
         if (client.getTotalCount() < 1_000) {
             result.observation("Fewer than 1 000 measured requests across trials: p99.9 is not resolvable and equals the maximum.");
@@ -501,16 +502,6 @@ public final class ThreadPoolStarvationScenario implements Scenario {
     private static double[] values(List<Trial> trials, String metric) {
         return trials.stream().map(t -> t.metrics().get(metric)).filter(v -> v != null && Double.isFinite(v))
                 .mapToDouble(Double::doubleValue).sorted().toArray();
-    }
-
-    private static double median(double[] sorted) {
-        if (sorted.length == 0) {
-            return Double.NaN;
-        }
-        double[] s = sorted.clone();
-        Arrays.sort(s);
-        int n = s.length;
-        return n % 2 == 1 ? s[n / 2] : (s[n / 2 - 1] + s[n / 2]) / 2;
     }
 
     private static double round(double v, int digits) {

@@ -17,10 +17,10 @@ import dev.forge.lab.scenario.ScenarioResult.Trial;
 import dev.forge.lab.scenario.VariantSpec;
 import dev.forge.lab.scenarios.failure.InventoryService.Fault;
 import dev.forge.lab.scenarios.failure.ResilientClient.Policy;
+import dev.forge.lab.stats.Summary;
 import org.HdrHistogram.Histogram;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -431,15 +431,15 @@ public final class DownstreamFaultScenario implements Scenario {
                     policy.retryBudget() >= 0 ? String.format(Locale.ROOT, "; the retry budget limits it to about %.0f attempts/s", c.rate() * (1 + policy.retryBudget())) : ""));
         }
         result.observation(String.format(Locale.ROOT, "Median across %d trials: success %.2f%%, p99 %.1f ms, %.2f attempts per request, peak dependency backlog %.0f, wasted work %.1f%%.",
-                trials.size(), median(values(trials, "successPercent")), median(values(trials, "latencyP99Ms")),
-                median(values(trials, "amplification")), median(values(trials, "peakBacklog")), median(values(trials, "wastedPercent"))));
+                trials.size(), Summary.median(values(trials, "successPercent")), Summary.median(values(trials, "latencyP99Ms")),
+                Summary.median(values(trials, "amplification")), Summary.median(values(trials, "peakBacklog")), Summary.median(values(trials, "wastedPercent"))));
         if (c.fault() != Fault.NONE) {
             long recovered = trials.stream().filter(t -> t.metrics().containsKey("recoveryMs")).count();
             result.observation(String.format(Locale.ROOT, "During the fault, %.1f%% of completions succeeded (median).",
-                    median(values(trials, "faultSuccessPercent"))));
+                    Summary.median(values(trials, "faultSuccessPercent"))));
             if (recovered == trials.size()) {
                 result.observation(String.format(Locale.ROOT, "Recovered in every trial; median recovery %.0f ms after the fault ended (window %.0f ms).",
-                        median(values(trials, "recoveryMs")), c.windowNanos() / 1e6));
+                        Summary.median(values(trials, "recoveryMs")), c.windowNanos() / 1e6));
             } else {
                 result.observation(String.format(Locale.ROOT,
                         "Did not recover before the end of the sustained phase in %d of %d trials, although the fault had ended — the failure outlived its trigger (look for a backlog that keeps growing in the timeline).",
@@ -455,7 +455,7 @@ public final class DownstreamFaultScenario implements Scenario {
         }
         if (policy.breaker()) {
             result.observation(String.format(Locale.ROOT, "The breaker was open for a median of %.0f ms; %.1f%% of requests were short-circuited.",
-                    median(values(trials, "breakerOpenMs")), median(values(trials, "shortCircuitedPercent"))));
+                    Summary.median(values(trials, "breakerOpenMs")), Summary.median(values(trials, "shortCircuitedPercent"))));
         }
     }
 
@@ -471,17 +471,8 @@ public final class DownstreamFaultScenario implements Scenario {
                 .mapToDouble(Double::doubleValue).sorted().toArray();
     }
 
-    private static double median(double[] sorted) {
-        if (sorted.length == 0) {
-            return Double.NaN;
-        }
-        double[] s = sorted.clone();
-        Arrays.sort(s);
-        return (s[(s.length - 1) / 2] + s[s.length / 2]) / 2;
-    }
-
     private static double median(List<Double> xs) {
-        return median(xs.stream().mapToDouble(Double::doubleValue).toArray());
+        return Summary.median(xs.stream().mapToDouble(Double::doubleValue).toArray());
     }
 
     private static double round(double v, int digits) {

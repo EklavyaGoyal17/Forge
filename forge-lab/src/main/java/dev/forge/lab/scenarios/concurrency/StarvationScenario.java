@@ -15,6 +15,7 @@ import dev.forge.lab.scenario.ScenarioResult;
 import dev.forge.lab.scenario.ScenarioResult.InvariantSummary;
 import dev.forge.lab.scenario.ScenarioResult.Trial;
 import dev.forge.lab.scenario.VariantSpec;
+import dev.forge.lab.stats.Summary;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -26,8 +27,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.LockSupport;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
-import static dev.forge.lab.scenarios.concurrency.LivelockScenario.median;
 import static dev.forge.lab.scenarios.concurrency.LivelockScenario.values;
+import static dev.forge.lab.stats.Summary.median;
 
 /**
  * Starvation: a reader–writer lock under continuous read traffic.

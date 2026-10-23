@@ -244,7 +244,7 @@ public final class IndexLookupScenario implements Scenario {
             double[] medians = trials.stream().mapToDouble(x -> x.metrics().get("medianQueryMs")).sorted().toArray();
             result.observation("Access path chosen for the probe lookup: " + trials.get(0).note() + ".");
             result.observation(String.format("Median lookup time across %d trials: %.3f ms (per-trial medians %.3f–%.3f ms), %.1f rows per lookup on average.",
-                    trials.size(), median(medians), medians[0], medians[medians.length - 1], trials.get(0).metrics().get("rowsPerQuery")));
+                    trials.size(), Summary.median(medians), medians[0], medians[medians.length - 1], trials.get(0).metrics().get("rowsPerQuery")));
             result.observation(String.format("Probe account %d returned %d rows, checksum %d. Identical checksums across variants mean the index changed how the rows were found, not which rows.",
                     probeAccount, probe.rows(), probe.checksum()));
             if (index != null) {
@@ -274,11 +274,6 @@ public final class IndexLookupScenario implements Scenario {
             }
             return new Probe(rows, sum);
         }
-    }
-
-    static double median(double[] sorted) {
-        int n = sorted.length;
-        return n % 2 == 1 ? sorted[n / 2] : (sorted[n / 2 - 1] + sorted[n / 2]) / 2;
     }
 
     private static double round(double v) {

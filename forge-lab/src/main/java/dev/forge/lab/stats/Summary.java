@@ -65,7 +65,11 @@ public record Summary(int n, double mean, double stddev, double min, double max,
         return sorted[lo] + (h - lo) * (sorted[hi] - sorted[lo]);
     }
 
+    /** Median of an unsorted sample; {@code NaN} when it is empty. */
     public static double median(double[] values) {
+        if (values.length == 0) {
+            return Double.NaN;
+        }
         double[] sorted = values.clone();
         Arrays.sort(sorted);
         return percentileSorted(sorted, 50);
