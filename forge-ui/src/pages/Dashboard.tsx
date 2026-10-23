@@ -1,28 +1,25 @@
 import { useQuery } from '@tanstack/react-query'
-import { ArrowRight, Lock } from 'lucide-react'
+import { ArrowRight } from 'lucide-react'
 import { Link } from 'react-router'
-import { Badge, Button, Card, EmptyState, Stat, StatusPill } from '../components/ui'
+import { Button, Card, EmptyState, Stat, StatusPill } from '../components/ui'
 import { api } from '../lib/api'
 import { bytes, duration, relativeTime, runDuration } from '../lib/format'
 import { ExperimentTable } from './Experiments'
 
-const SHOWCASES: { title: string; text: string; available: boolean; to?: string; needs?: string }[] = [
+const SHOWCASES: { title: string; text: string; to: string }[] = [
   {
     title: 'The Invisible Race',
     text: 'A shared balance loses deposits under contention. Measure it, enumerate every interleaving, repair it, and verify the invariant — then see why passing tests are not a proof.',
-    available: true,
     to: '/experiments/new?scenario=concurrency.lost-update&demo=race',
   },
   {
     title: 'The Query That Wouldn’t Scale',
     text: 'OFFSET vs keyset pagination over seeded transaction history, with EXPLAIN ANALYZE plans side by side.',
-    available: true,
     to: '/experiments/new?scenario=database.pagination&demo=pagination',
   },
   {
     title: 'The Performance Mystery',
     text: 'A service whose throughput plateaus under load: open-model load tests, JFR profiles, a fix, and a comparable re-run.',
-    available: true,
     to: '/experiments/new?scenario=performance.thread-pool-starvation&demo=mystery',
   },
 ]
@@ -44,18 +41,11 @@ export function Dashboard() {
 
       <div className="grid gap-4 lg:grid-cols-3">
         {SHOWCASES.map((s) => (
-          <Card key={s.title} className={s.available ? '' : 'opacity-75'}>
+          <Card key={s.title}>
             <div className="flex h-full flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <h2 className="font-semibold">{s.title}</h2>
-                {s.available ? <Badge tone="ok">available</Badge> : <Badge><Lock size={10} className="mr-1" /> planned</Badge>}
-              </div>
+              <h2 className="font-semibold">{s.title}</h2>
               <p className="flex-1 text-[13px] leading-relaxed text-dim">{s.text}</p>
-              {s.available ? (
-                <Link to={s.to!}><Button variant="primary">Start <ArrowRight size={14} /></Button></Link>
-              ) : (
-                <p className="text-[12px] text-muted">Requires {s.needs}. Not implemented yet — no demo data is shown in its place.</p>
-              )}
+              <div><Link to={s.to}><Button variant="primary">Start <ArrowRight size={14} /></Button></Link></div>
             </div>
           </Card>
         ))}

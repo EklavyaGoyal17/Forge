@@ -104,7 +104,6 @@ export function Layout() {
                     <>
                       <span className={isActive ? 'text-accent' : 'text-muted'}>{ICONS[m.path]}</span>
                       <span className="flex-1 truncate">{m.label}</span>
-                      {!m.implemented && <span className="text-[10px] text-muted" title={`Planned for phase ${m.phase}`}>P{m.phase}</span>}
                     </>
                   )}
                 </NavLink>

@@ -6,7 +6,6 @@ import type { Lab } from '../lib/api'
 import { api } from '../lib/api'
 import { MODULES } from '../lib/labs'
 import { ExperimentTable } from './Experiments'
-import { PlannedModule } from './PlannedModule'
 
 const LAB_INTRO: Partial<Record<Lab, { heading: string; points: string[] }>> = {
   CONCURRENCY: {
@@ -62,7 +61,6 @@ export function LabPage({ lab }: { lab: Lab }) {
   const module = MODULES.find((m) => m.lab === lab)!
   const scenarios = useQuery({ queryKey: ['scenarios'], queryFn: api.scenarios })
   const experiments = useQuery({ queryKey: ['experiments', '', lab], queryFn: () => api.experiments(undefined, lab.toLowerCase()) })
-  if (!module.implemented) return <PlannedModule module={module} />
   const list = scenarios.data?.filter((s) => s.lab === lab) ?? []
   const intro = LAB_INTRO[lab]
 

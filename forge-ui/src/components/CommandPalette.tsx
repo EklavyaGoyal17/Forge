@@ -36,7 +36,7 @@ export function CommandPalette({ open, onClose, onToggleTheme }: { open: boolean
         <Command.Group heading="Navigate" className="text-[11px] text-muted [&_[cmdk-group-heading]]:px-2 [&_[cmdk-group-heading]]:py-1.5">
           {MODULES.map((m) => (
             <Item key={m.path} onSelect={() => go(m.path)} hint={m.shortcut}>
-              {m.label}{!m.implemented && ` — planned (phase ${m.phase})`}
+              {m.label}
             </Item>
           ))}
         </Command.Group>
